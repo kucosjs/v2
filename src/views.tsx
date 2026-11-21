@@ -5,10 +5,9 @@ import { safeUrl } from './http.js'
 import { renderMarkdown } from './markdown.js'
 
 type Page = { title: string; area?: 'overview' | 'spam' | 'comments' | 'demo' }
+type PageRenderer = (content: string | Promise<string>, props: Page) => Response
 declare module 'hono' {
-  interface ContextRenderer {
-    (content: string | Promise<string>, props: Page): Response
-  }
+  interface ContextRenderer extends PageRenderer {}
 }
 
 export const renderer = jsxRenderer(({ children, title, area }) => (
@@ -130,12 +129,6 @@ export function CommentList({ comments, article, review, page, hasNext, notice }
 export function Demo({ publicUrl }: { publicUrl: string }) {
   return (
     <>
-      {/*<h1>Comments and kudos for static sites</h1>
-      <p class="muted">Add the Kucos widget to any page on a registered site.</p>
-      <pre class="snippet"><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
-      <div id="kucos-comments"></div>
-      <script src="/min/kucos.min.js" defer></script>*/}
-
       <section class="demo-hero" aria-labelledby="demo-title">
         <div class="demo-intro">
           <h1 id="demo-title">Make room for discussion.</h1>
@@ -168,7 +161,7 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
       <section id="discussion" class="demo-section" aria-labelledby="demo-discussion-title">
         <h2 id="demo-discussion-title">Try it here</h2>
         <p class="muted">Leave a comment or give this page kudos. No account needed.</p>
-        <div class="demo-widget"><div id="kucos-comments"></div></div>
+        <div class="demo-widget"><div id="kucos-comments" data-article={`${publicUrl}/demo`}></div></div>
         <script src="/min/kucos.min.js" defer></script>
       </section>
 

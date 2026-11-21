@@ -405,7 +405,8 @@
           const reply = button('Reply', () => {
             const selected = quote || selectedText();
             quote = '';
-            openForm({ text: selected ? selected.split('\n').map((line) => `> ${line}`).join('\n') + '\n\n' : '' });
+            const quoted = selected.split('\n').map((line) => `> ${line}`).join('\n');
+            openForm({ text: selected ? `${quoted}\n\n` : '' });
           }, 'kucos-quiet');
           reply.addEventListener('pointerdown', () => { quote = selectedText(); });
           actions.append(reply);

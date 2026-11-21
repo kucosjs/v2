@@ -23,7 +23,7 @@ markdown.use({
     link({ href, tokens }) {
       const label = this.parser.parseInline(tokens);
       const url = commentLink(href);
-      return url ? '<a href="' + escapeHtml(url) + '" rel="ugc nofollow noreferrer">' + label + '</a>' : label;
+      return url ? `<a href="${escapeHtml(url)}" rel="ugc nofollow noreferrer">${label}</a>` : label;
     },
     image({ text }) {
       return escapeHtml(text);
@@ -33,7 +33,7 @@ markdown.use({
       const rendered = language && highlight.getLanguage(language)
         ? highlight.highlight(text, { language, ignoreIllegals: true }).value
         : escapeHtml(text);
-      return '<pre><code>' + rendered + '</code></pre>\n';
+      return `<pre><code>${rendered}</code></pre>\n`;
     },
   },
   extensions: [{
@@ -48,7 +48,7 @@ markdown.use({
       }
     },
     renderer({ tokens }) {
-      return '<details class="kucos-spoiler"><summary>Show spoiler</summary><p>' + this.parser.parseInline(tokens ?? []) + '</p></details>\n';
+      return `<details class="kucos-spoiler"><summary>Show spoiler</summary><p>${this.parser.parseInline(tokens ?? [])}</p></details>\n`;
     },
   }, {
     name: 'inlineQuote',
@@ -58,7 +58,7 @@ markdown.use({
       const match = /^:"([^"\n]+)":/.exec(source);
       if (match) return { type: 'inlineQuote', raw: match[0], text: match[1] };
     },
-    renderer: ({ text }) => '<q>' + escapeHtml(text) + '</q>',
+    renderer: ({ text }) => `<q>${escapeHtml(text)}</q>`,
   }],
 });
 

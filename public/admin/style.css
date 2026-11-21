@@ -25,7 +25,6 @@ a { color: var(--accent); text-underline-offset: .18em; }
 .header-inner > .quiet { margin-inline-start: auto; }
 
 .main { padding-block: clamp(2rem, 6vw, 4rem); }
-.demo-page .header-inner, .demo-page .main { width: min(100% - clamp(36px, 10vw, 96px), 48rem); }
 h1 { margin: 0 0 1rem; line-height: 1.15; font-size: clamp(1.7rem, 4.3vw, 2.7rem); letter-spacing: -.04em; }
 .muted { color: var(--muted); }
 .sign-in { width: min(100% - 2rem, 29rem); }
@@ -70,13 +69,14 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
 
 
 .demo-page {
-  --panel: #fffdf8;
-  --line: #ded8cc;
-  --muted: #625a51;
-  --accent: #39349b;
+  --panel: #fff;
+  --line: #dedede;
+  --muted: #626262;
+  --accent: #303030;
+  --accent-soft: #ececec;
   min-height: 100vh;
-  color: #23211e;
-  background: #f9f6ef;
+  color: #242424;
+  background: #f7f7f7;
 }
 .demo-page .site-header { background: transparent; }
 .demo-page .header-inner, .demo-page .main {
@@ -118,7 +118,7 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
   color: #fff;
   text-decoration: none;
 }
-.demo-button:hover { background: #2e297e; }
+.demo-button:hover { background: #484848; }
 
 .demo-preview, .demo-widget {
   min-width: 0;
@@ -126,7 +126,7 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
   border: 1px solid var(--line);
   border-radius: .8rem;
 }
-.demo-preview { box-shadow: 0 12px 36px #3526120d; }
+.demo-preview { box-shadow: 0 12px 36px #0000000d; }
 .demo-preview-header {
   display: flex;
   flex-wrap: wrap;
@@ -143,7 +143,7 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
   gap: .35rem;
   padding: .2rem .6rem;
   border-radius: 2rem;
-  background: #eeebfa;
+  background: var(--accent-soft);
   color: var(--accent);
   font-size: .8rem;
   font-weight: 650;
@@ -156,7 +156,7 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
 .demo-reply {
   margin: .9rem 0 0 .4rem;
   padding: .2rem 0 .2rem .9rem;
-  border-inline-start: 2px solid #d3cbf0;
+  border-inline-start: 2px solid var(--line);
 }
 
 .demo-section {
@@ -172,8 +172,8 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
   padding: 1rem;
   overflow: auto;
   border-radius: .5rem;
-  background: #2d2940;
-  color: #f9f6ef;
+  background: #303030;
+  color: #f7f7f7;
   font-size: .875rem;
 }
 
