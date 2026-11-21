@@ -287,7 +287,7 @@
       return form;
     }
 
-    function renderThread(comments) {
+    function renderThread(comments, depth = 0) {
       return Object.values(comments).sort((a, b) => b.sticky - a.sticky).map((comment) => {
         const node = element('li', 'kucos-entry');
         const card = element('article', comment.spam ? 'kucos-comment kucos-comment-flagged' : 'kucos-comment');
@@ -360,28 +360,41 @@
 
         if (!comment.spam) {
           const votes = element('div', 'kucos-votes');
+          votes.setAttribute('role', 'group');
+          votes.setAttribute('aria-label', 'Comment voting');
           const score = element('span', 'kucos-score', formatScore(comment.score));
           score.setAttribute('aria-live', 'polite');
           const separator = element('span', '', '·');
           separator.setAttribute('aria-hidden', 'true');
           commentDetails.prepend(score, separator);
-          const vote = async (action) => {
+          const up = button('', () => vote('upvote'), 'kucos-vote kucos-vote-up');
+          const down = button('', () => vote('downvote'), 'kucos-vote');
+          up.title = 'Upvote';
+          down.title = 'Downvote';
+          up.setAttribute('aria-label', up.title);
+          down.setAttribute('aria-label', down.title);
+          votes.append(up, down);
+          if (comment.voted) markVoted();
+
+          function markVoted() {
+            up.disabled = down.disabled = true;
+            up.title = down.title = 'Already voted';
+            votes.setAttribute('aria-label', 'Already voted');
+            votes.title = 'Already voted';
+          }
+
+          async function vote(action) {
             up.disabled = down.disabled = true;
             try {
               const { message } = await api('/api/comments/vote', 'POST', { msgid: comment.id, action });
               score.textContent = formatScore(message.score);
               status.textContent = '';
+              markVoted();
             } catch (error) {
               showError(status, error);
               up.disabled = down.disabled = false;
             }
-          };
-          const up = button('', () => vote('upvote'), 'kucos-vote kucos-vote-up');
-          const down = button('', () => vote('downvote'), 'kucos-vote');
-          up.disabled = down.disabled = comment.voted;
-          up.setAttribute('aria-label', 'Upvote');
-          down.setAttribute('aria-label', 'Downvote');
-          votes.append(up, down);
+          }
           meta.append(votes);
           function selectedText() {
             const selection = shadow.getSelection?.() ?? window.getSelection();
@@ -409,9 +422,9 @@
         }
         meta.append(actions);
 
-        const replies = renderThread(comment.children);
+        const replies = renderThread(comment.children, depth + 1);
         if (replies.length) {
-          const details = element('details', 'kucos-replies');
+          const details = element('details', depth >= 5 ? 'kucos-replies kucos-replies-compact' : 'kucos-replies');
           details.open = true;
           const list = element('ul', 'kucos-thread');
           list.append(...replies);

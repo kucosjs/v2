@@ -13,14 +13,14 @@ a { color: var(--accent); text-underline-offset: .16em; }
 [hidden], .kucos-status:empty, .kucos-inline-editor:empty { display: none; }
 
 .kucos {
-  --ink: #26272c;
-  --muted: #60636d;
-  --line: #e2e3e7;
-  --border: #c8cbd2;
-  --soft: #f5f5f7;
-  --accent: #39349b;
-  --accent-hover: #2c277d;
-  --accent-soft: #eeebfa;
+  --ink: #242424;
+  --muted: #626262;
+  --line: #e2e2e2;
+  --border: #c8c8c8;
+  --soft: #f5f5f5;
+  --accent: #303030;
+  --accent-hover: #484848;
+  --accent-soft: #ececec;
   --radius: 6px;
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -128,12 +128,12 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
   border-radius: var(--radius);
   scroll-margin: .75rem;
 }
-.kucos-comment-flagged { background: #f8f4f5; }
+.kucos-comment-flagged { background: var(--soft); }
 .kucos-comment.kucos-highlight { background: var(--accent-soft); border-inline-start-color: var(--accent); }
 .kucos-confirmation { margin: 0 0 .45rem; color: var(--accent); font-size: .9em; font-weight: 650; }
 .kucos-meta {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto max-content;
   align-items: center;
   column-gap: .55rem;
 }
@@ -165,7 +165,7 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
 .kucos-tag { padding: .05rem .4rem; border-radius: 2rem; background: var(--soft); }
 .kucos-pinned { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .kucos-flagged { background: #fbe7e4; color: #8e2c29; font-weight: 700; text-transform: uppercase; }
-.kucos-content { margin: .55rem 0 .55rem; }
+.kucos-content { margin: .55rem 0 .2rem; }
 .kucos-content > :first-child { margin-block-start: 0; }
 .kucos-content > :last-child { margin-block-end: 0; }
 .kucos-content blockquote {
@@ -181,10 +181,11 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
 .kucos-content :not(pre) > code { padding: .08em .22em; border-radius: 3px; background: var(--soft); }
 .kucos-content table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; }
 .kucos-content :is(th, td) { padding: .32rem .5rem; border: 1px solid var(--line); }
-.kucos-comment-actions { grid-column: -2; justify-self: end; gap: .1rem; }
+.kucos-comment-actions { grid-column: -2; justify-self: end; flex-wrap: nowrap; gap: .25em; }
 .kucos-comment-actions:empty { display: none; }
 .kucos-entry .kucos-quiet { min-height: 32px; }
-.kucos-votes { display: flex; }
+.kucos-comment-actions .kucos-quiet { padding-inline: .4em; white-space: nowrap; }
+.kucos-votes { display: flex; justify-content: center; align-items: center; min-block-size: 32px; }
 .kucos-vote {
   display: grid;
   place-items: center;
@@ -194,7 +195,7 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink);
 }
 .kucos-vote::before {
   content: '';
@@ -206,14 +207,15 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
 }
 .kucos-vote-up::before { transform: translateY(2px) rotate(225deg); }
 .kucos-vote:not(:disabled):hover { color: var(--accent); }
+.kucos-vote:disabled { color: #969696; opacity: 1; }
 .kucos-score, .kucos-count { font-variant-numeric: tabular-nums; }
 .kucos-score { font-weight: 650; }
 .kucos-replies { margin-block: .15rem .35rem; margin-inline-start: clamp(.5rem, 3cqi, 1.1rem); }
 .kucos-replies > summary { padding: .25rem .55rem; }
 .kucos-replies > .kucos-thread { display: grid; gap: .35rem; }
-.kucos-replies .kucos-entry { border-inline-start-color: #d7cff0; }
-.kucos-replies .kucos-replies .kucos-replies { margin-inline-start: 0; }
-.kucos-replies .kucos-replies .kucos-replies .kucos-entry { padding-inline-start: 0; border: 0; }
+.kucos-replies .kucos-entry { border-inline-start-color: var(--line); }
+.kucos-replies.kucos-replies-compact { margin-inline-start: 0; }
+.kucos-replies-compact > .kucos-thread > .kucos-entry { padding-inline-start: 1px; border-inline-start-width: 1px; }
 .kucos-inline-editor { margin-block-start: .55rem; padding-inline-start: .65rem; border-inline-start: 2px solid var(--line); }
 .kucos-spoiler { padding: .35rem .55rem; border: 1px solid var(--line); border-radius: var(--radius); }
 .kucos-spoiler p { margin: .35rem 0 0; }
