@@ -104,6 +104,7 @@
     shadow.append(style, root);
     mount.replaceChildren(host);
     let given = false;
+    let highlightedComment = null;
 
     function updateKudos(result) {
       given = result.given;
@@ -128,21 +129,27 @@
       status.textContent = error instanceof Error ? error.message : 'Kucos could not complete the request.';
     }
 
-    function focusComment(id) {
-      const target = shadow.getElementById(id);
+    function focusComment(target, block = 'nearest') {
       if (!target) return;
       for (let parent = target.parentElement; parent && parent !== thread; parent = parent.parentElement) {
         if (parent.tagName === 'DETAILS') parent.open = true;
       }
-      target.scrollIntoView({ block: 'nearest' });
       target.focus({ preventScroll: true });
+      target.scrollIntoView({ block, inline: 'nearest' });
     }
 
-    function focusPermalink() {
-      if (location.hash.startsWith('#comment-')) focusComment(location.hash.slice(1));
+    function focusPermalink(hash = location.hash, moveFocus = true) {
+      const id = hash.startsWith('#comment-') ? hash.slice(1) : '';
+      const target = id ? shadow.getElementById(id) : null;
+      if (highlightedComment !== target) {
+        highlightedComment?.classList.remove('kucos-highlight');
+        target?.classList.add('kucos-highlight');
+        highlightedComment = target;
+      }
+      if (moveFocus) focusComment(target, 'start');
     }
 
-    window.addEventListener('hashchange', focusPermalink);
+    window.addEventListener('hashchange', () => focusPermalink());
 
     async function refresh(focusId) {
       thread.setAttribute('aria-busy', 'true');
@@ -154,8 +161,8 @@
         const list = element('ul', 'kucos-thread');
         list.append(...nodes);
         thread.replaceChildren(nodes.length ? list : element('p', 'kucos-empty', 'No comments yet.'));
-        if (focusId) focusComment(`comment-${focusId}`);
-        else focusPermalink();
+        focusPermalink(location.hash, !focusId);
+        if (focusId) focusComment(shadow.getElementById(`comment-${focusId}`));
       } catch (error) {
         showError(notice, error);
         thread.replaceChildren(button('Try again', () => {
@@ -260,8 +267,9 @@
     function renderThread(comments) {
       return Object.values(comments).sort((a, b) => b.sticky - a.sticky).map((comment) => {
         const node = element('li', 'kucos-entry');
-        node.id = `comment-${comment.id}`;
-        node.tabIndex = -1;
+        const card = element('article', 'kucos-comment');
+        card.id = `comment-${comment.id}`;
+        card.tabIndex = -1;
         const meta = element('div', 'kucos-meta');
         const author = element('strong', '', comment.authorText);
         if (comment.website) {
@@ -275,25 +283,29 @@
         const stamp = element('time', '', comment.created);
         stamp.dateTime = comment.createdOn;
         stamp.title = comment.createdOnTime;
-        const permalink = itemLink('', new URL(`#comment-${comment.id}`, location.href));
-        permalink.addEventListener('click', () => {
-          if (location.hash === permalink.hash) focusComment(node.id);
+        const permalink = itemLink('', new URL(`#${card.id}`, location.href));
+        permalink.addEventListener('click', (event) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+          event.preventDefault();
+          if (location.hash !== permalink.hash) {
+            history.pushState(history.state, '', new URL(permalink.hash, location.href));
+          }
+          focusPermalink(permalink.hash);
         });
         permalink.append(stamp);
         meta.append(author, permalink);
         if (comment.sticky) meta.append(element('span', 'kucos-tag', 'Pinned'));
         if (comment.edited) meta.append(element('span', 'kucos-tag', 'Edited'));
-        node.append(meta);
-
         const content = element('div', 'kucos-content');
         if (comment.spam) content.textContent = 'Awaiting moderation.';
         else content.innerHTML = comment.comment;
-        node.append(content);
         const actions = element('div', 'kucos-controls');
         const status = element('span', 'kucos-status');
         status.setAttribute('role', 'status');
         const followUp = element('div', 'kucos-inline-editor');
-        node.append(actions, followUp);
+        card.append(meta, content, actions, followUp);
+        node.append(card);
 
         function openForm(options) {
           followUp.replaceChildren(commentForm({ parentId: comment.id, close: () => followUp.replaceChildren(), ...options }));
