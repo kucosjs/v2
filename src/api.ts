@@ -8,6 +8,7 @@ import { canEdit, commentThreads, EDIT_WINDOW, publicComment } from './comments.
 import type { Config } from './config.js'
 import type { PrismaClient, Moderation } from './generated/prisma/client.js'
 import { articleUrl, clientIp, failure, requestBody, safeUrl, success, visitor, writeVisitor } from './http.js'
+import { publicRateLimit } from './rate-limit.js'
 
 type Services = { database: PrismaClient; config: Config; akismet: Akismet }
 
@@ -39,9 +40,10 @@ export function createApi({ database, config, akismet }: Services) {
     origin: (origin) => config.allowedOrigins.has(origin) ? origin : undefined,
     allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'X-Kucos-Visitor'],
+    exposeHeaders: ['Retry-After'],
     credentials: true,
   }))
-  api.use('*', bodyLimit({ maxSize: 64 * 1024 }))
+  api.use('*', publicRateLimit(config.proxyHops), bodyLimit({ maxSize: 64 * 1024 }))
 
   function allowsWrite(c: Context, article: URL) {
     const origin = c.req.header('Origin')

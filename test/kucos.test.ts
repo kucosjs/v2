@@ -19,16 +19,17 @@ const site = new URL(article).origin
 const visitor = randomUUID()
 const otherVisitor = randomUUID()
 const feedback: string[] = []
+const config = {
+  publicUrl: 'http://localhost:3000',
+  allowedOrigins: new Set(['http://localhost:3000', site]),
+  adminPassword: 'test-password',
+  akismetKey: undefined,
+  akismetTesting: false,
+  proxyHops: 1,
+}
 const app = createApp({
   database,
-  config: {
-    publicUrl: 'http://localhost:3000',
-    allowedOrigins: new Set(['http://localhost:3000', site]),
-    adminPassword: 'test-password',
-    akismetKey: undefined,
-    akismetTesting: false,
-    proxyHops: 1,
-  },
+  config,
   akismet: {
     enabled: true,
     check: async ({ content }) => {
@@ -188,6 +189,49 @@ test('only registered origins may preflight and post to their own articles', asy
   const other = await write('/api/comments', { article_url: article, comment: 'Rejected' }, visitor, 'POST', 'https://other.example')
   assert.equal(other.status, 403)
   assert.equal(other.headers.get('Access-Control-Allow-Origin'), null)
+})
+
+test('the public API limits reads and writes separately for each client IP', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+  const limited = createApp({ database, config })
+  const headers = { 'Content-Type': 'application/json', 'X-Forwarded-For': '192.0.2.10', Origin: site }
+  const write = (requestHeaders = headers) => limited.request('/api/comments', {
+    method: 'POST', headers: requestHeaders, body: '{}',
+  })
+
+  for (let index = 0; index < 90; index++) assert.equal((await write()).status, 400)
+  const denied = await write()
+  assert.equal(denied.status, 429)
+  assert.match(denied.headers.get('Retry-After') ?? '', /^(?:[1-9]|[1-5][0-9]|60)$/)
+  assert.equal(denied.headers.get('Access-Control-Allow-Origin'), site)
+  assert.match(denied.headers.get('Access-Control-Expose-Headers') ?? '', /Retry-After/i)
+  assert.equal((await limited.request('/api/kudos', { method: 'POST', headers, body: '{}' })).status, 429)
+  assert.equal((await write({ ...headers, 'X-Forwarded-For': '192.0.2.11' })).status, 400)
+
+  for (let index = 0; index < 360; index++) {
+    assert.equal((await limited.request('/api/comments/invalid-url', { headers })).status, 400)
+  }
+  assert.equal((await limited.request('/api/comments/invalid-url', { headers })).status, 429)
+  const preflight = await limited.request('/api/comments', {
+    method: 'OPTIONS', headers: { ...headers, 'Access-Control-Request-Method': 'POST' },
+  })
+  assert.equal(preflight.status, 204)
+
+  context.mock.timers.tick(60_000)
+  assert.equal((await write()).status, 400)
+})
+
+test('public API limits use the socket IP when no proxy is trusted', async () => {
+  const limited = createApp({ database, config: { ...config, proxyHops: 0 } })
+  const write = (remoteAddress: string, forwardedFor: string) => limited.request('/api/kudos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': forwardedFor }, body: '{}',
+  }, { incoming: { socket: { remoteAddress } } })
+
+  for (let index = 0; index < 90; index++) {
+    assert.equal((await write('192.0.2.12', '192.0.2.13')).status, 400)
+  }
+  assert.equal((await write('192.0.2.12', '192.0.2.14')).status, 429)
+  assert.equal((await write('192.0.2.15', '192.0.2.13')).status, 400)
 })
 
 test('keeps very deep threads serializable without losing replies', () => {

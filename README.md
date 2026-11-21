@@ -46,6 +46,8 @@ Comments support Markdown, including links, quotes, strikethrough, and fenced co
 | `AKISMET_TESTING` | Set to `true` to send Akismet requests in test mode. Defaults to `false`. |
 | `TRUST_PROXY_HOPS` | Defaults to `0`, which uses the direct connection IP. Set it to the number of trusted proxy hops if the server is only reachable through those proxies. |
 
+The public API allows 360 reads and 90 writes per IP in each 60-second window, per server process. CORS preflight requests are exempt. Requests over either quota receive `429` with a `Retry-After` header.
+
 With Akismet enabled, Kucos sends the commenter IP address, browser user agent, comment, and optional identity fields to Akismet. It retains the submitter IP and user agent with the comment so moderators can report false positives or missed spam. If a spam check fails, the comment goes to the review queue. [Akismet developer documentation](https://akismet.com/developers/)
 
 ## Import from Kucos v1
