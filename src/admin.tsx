@@ -7,7 +7,8 @@ import { z } from 'zod'
 import type { Context } from 'hono'
 import type { Config } from './config.js'
 import type { Akismet } from './akismet.js'
-import type { Comment, PrismaClient } from './generated/prisma/client.js'
+import type { CommentWithArticle } from './comments.js'
+import type { PrismaClient } from './generated/prisma/client.js'
 import { articleUrl, clientIp, digest, failure, requestBody, success } from './http.js'
 import { CommentList, Demo, Overview, SignIn, renderer } from './views.js'
 
@@ -119,13 +120,16 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   })
 
   admin.get('/overview', protect, async (c) => {
-    const groups = await database.comment.groupBy({ by: ['article', 'moderation'], _count: true, orderBy: { article: 'asc' } })
-    const articles = new Map<string, { article: string; total: number; review: number }>()
+    const [records, groups] = await database.$transaction([
+      database.article.findMany({ where: { comments: { some: {} } }, orderBy: { url: 'asc' }, select: { id: true, url: true } }),
+      database.comment.groupBy({ by: ['articleId', 'moderation'], _count: true, orderBy: { articleId: 'asc' } }),
+    ])
+    const articles = new Map(records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]))
     for (const group of groups) {
-      const stats = articles.get(group.article) ?? { article: group.article, total: 0, review: 0 }
+      const stats = articles.get(group.articleId)
+      if (!stats) continue
       stats.total += group._count
       if (group.moderation !== 'published') stats.review += group._count
-      articles.set(group.article, stats)
     }
     return c.render(<Overview articles={[...articles.values()]} />, { title: 'Articles', area: 'overview' })
   })
@@ -138,7 +142,8 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     if (!review && !article) return c.redirect('/overview')
     const page = pageNumber(c.req.query('page'))
     const comments = await database.comment.findMany({
-      where: review ? { moderation: { not: 'published' } } : { article },
+      where: review ? { moderation: { not: 'published' } } : { article: { url: article } },
+      include: { article: { select: { url: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * pageSize, take: pageSize + 1,
     })
@@ -152,10 +157,12 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
 
   async function moderate(id: string | undefined, action: Action) {
     if (!id) return { comment: undefined, feedbackFailed: false }
-    let changed: Comment | undefined
+    let changed: CommentWithArticle | undefined
     let sendFeedback: 'submit-ham' | 'submit-spam' | undefined
     await database.$transaction(async (tx) => {
-      const comment = await tx.comment.findUnique({ where: { id } })
+      const comment = await tx.comment.findUnique({
+        where: { id }, include: { article: { select: { url: true } } },
+      })
       if (!comment) return
       changed = comment
 
@@ -175,7 +182,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     let feedbackFailed = false
     if (changed && sendFeedback && akismet.enabled && changed.ip) {
       try {
-        await akismet.feedback(changed, sendFeedback)
+        await akismet.feedback({ ...changed, article: changed.article.url }, sendFeedback)
       } catch {
         feedbackFailed = true
         console.warn('Akismet feedback failed.')
@@ -193,7 +200,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     const { comment, feedbackFailed } = await moderate(c.req.param('id'), action)
     if (!comment) return failure(c, 'Comment not found.', 404)
     const params = new URLSearchParams({
-      ...(view === 'comments' ? { url: comment.article } : {}),
+      ...(view === 'comments' ? { url: comment.article.url } : {}),
       page: String(pageNumber(page)),
       updated: feedbackFailed ? 'feedback' : action === 'delete' ? 'removed' : 'updated',
     })

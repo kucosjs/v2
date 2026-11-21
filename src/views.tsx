@@ -1,6 +1,6 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { raw } from 'hono/html'
-import type { Comment } from './generated/prisma/client.js'
+import type { CommentWithArticle } from './comments.js'
 import { safeUrl } from './http.js'
 import { renderMarkdown } from './markdown.js'
 
@@ -87,7 +87,7 @@ export function Overview({ articles }: { articles: ArticleStats[] }) {
 }
 
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
-type ViewProps = { comments: Comment[]; article?: string; review: boolean; page: number; hasNext: boolean; notice?: string }
+type ViewProps = { comments: CommentWithArticle[]; article?: string; review: boolean; page: number; hasNext: boolean; notice?: string }
 
 export function CommentList({ comments, article, review, page, hasNext, notice }: ViewProps) {
   const path = review ? '/spam' : '/comments'
@@ -107,7 +107,7 @@ export function CommentList({ comments, article, review, page, hasNext, notice }
             {comment.moderation !== 'published' && <span class="tag">{comment.moderation === 'spam' ? 'Spam' : 'Pending'}</span>}
             {comment.pinned && <span class="tag">Pinned</span>}
           </header>
-          {review && <a href={`/comments?url=${encodeURIComponent(comment.article)}`} class="article-link">{comment.article}</a>}
+          {review && <a href={`/comments?url=${encodeURIComponent(comment.article.url)}`} class="article-link">{comment.article.url}</a>}
           <div class="comment-body">{raw(renderMarkdown(comment.content))}</div>
           <form action={`/moderate/${comment.id}`} method="post" class="actions">
             <input type="hidden" name="view" value={review ? 'spam' : 'comments'} />

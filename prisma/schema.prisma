@@ -14,9 +14,17 @@ enum Moderation {
   spam
 }
 
+model Article {
+  id       String    @id @default(uuid())
+  url      String    @unique
+  comments Comment[]
+  kudos    Kudos?
+}
+
 model Comment {
   id         String     @id @default(uuid())
-  article    String
+  articleId  String
+  article    Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
   author     String     @default("Anonymous")
   content    String
   email      String?
@@ -35,7 +43,7 @@ model Comment {
   userAgent  String?
   votes      Vote[]
 
-  @@index([article, createdAt])
+  @@index([articleId, createdAt])
   @@index([parentId])
   @@index([moderation, createdAt])
 }
@@ -49,17 +57,18 @@ model Vote {
 }
 
 model Kudos {
-  article String        @id
-  count   Int           @default(0)
-  members KudosMember[]
+  articleId String        @id
+  article   Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  count     Int           @default(0)
+  members   KudosMember[]
 }
 
 model KudosMember {
-  article String
-  visitor String
-  kudos   Kudos  @relation(fields: [article], references: [article], onDelete: Cascade)
+  articleId String
+  visitor   String
+  kudos     Kudos  @relation(fields: [articleId], references: [articleId], onDelete: Cascade)
 
-  @@id([article, visitor])
+  @@id([articleId, visitor])
 }
 
 model AdminSession {

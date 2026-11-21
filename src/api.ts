@@ -74,7 +74,7 @@ export function createApi({ database, config, akismet }: Services) {
     const editing = c.req.method === 'PATCH'
     const owner = writeVisitor(c, config)
     const linked = input.parent_id && await database.comment.findFirst({
-      where: { id: input.parent_id, article: article.href },
+      where: { id: input.parent_id, article: { url: article.href } },
     })
     if ((editing || input.parent_id) && !linked) return failure(c, 'Comment not found.', 404)
 
@@ -88,8 +88,7 @@ export function createApi({ database, config, akismet }: Services) {
 
     const previous = editing && linked ? linked : undefined
     const now = new Date()
-    const data: SpamInput = {
-      article: article.href,
+    const data = {
       author: input.author === undefined ? previous?.author ?? 'Anonymous' : input.author || 'Anonymous',
       content: input.comment,
       email: input.email === undefined ? previous?.email ?? null : input.email || null,
@@ -98,13 +97,14 @@ export function createApi({ database, config, akismet }: Services) {
       userAgent: akismet.enabled ? c.req.header('User-Agent')?.slice(0, 1024) ?? null : null,
       createdAt: previous?.createdAt ?? now,
     }
-    const checked = await verdict(data)
+    const checked = await verdict({ ...data, article: article.href })
     const moderation = previous?.moderation === 'spam' ? 'spam' : checked
 
     if (previous) {
       const updated = await database.comment.updateManyAndReturn({
         where: {
           id: previous.id, owner, updatedAt: previous.updatedAt, moderation: previous.moderation,
+          article: { url: article.href },
           createdAt: { gte: new Date(Date.now() - EDIT_WINDOW) },
         },
         data: {
@@ -116,9 +116,17 @@ export function createApi({ database, config, akismet }: Services) {
     }
 
     try {
-      const record = await database.comment.create({
-        data: { ...data, owner, parentId: linked ? linked.id : null, moderation, updatedAt: now },
+      const record = await database.$transaction(async (tx) => {
+        const url = article.href
+        const storedArticle = linked
+          ? await tx.article.findUnique({ where: { id: linked.articleId, url }, select: { id: true } })
+          : await tx.article.upsert({ where: { url }, create: { url }, update: {}, select: { id: true } })
+        if (!storedArticle) return null
+        return tx.comment.create({
+          data: { ...data, articleId: storedArticle.id, owner, parentId: linked ? linked.id : null, moderation, updatedAt: now },
+        })
       })
+      if (!record) return failure(c, 'Parent comment not found.', 404)
       return success(c, publicComment(record, owner), 201)
     } catch (error) {
       if (knownError(error, 'P2003')) return failure(c, 'Parent comment not found.', 404)
@@ -138,7 +146,7 @@ export function createApi({ database, config, akismet }: Services) {
     const article = articleUrl(c.req.param('id'))
     if (!article) return failure(c, 'Invalid article URL.')
     const comments = await database.comment.findMany({
-      where: { article: article.href },
+      where: { article: { url: article.href } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     return c.json({ count: comments.length, comments: commentThreads(comments, visitor(c)) })
@@ -152,9 +160,12 @@ export function createApi({ database, config, akismet }: Services) {
 
     try {
       const updated = await database.$transaction(async (tx) => {
-        const comment = await tx.comment.findUnique({ where: { id: msgid } })
+        const comment = await tx.comment.findUnique({
+          where: { id: msgid },
+          select: { moderation: true, article: { select: { url: true } } },
+        })
         if (!comment || comment.moderation !== 'published') return null
-        const article = articleUrl(comment.article)
+        const article = articleUrl(comment.article.url)
         if (!article || !allowsWrite(c, article)) return false
         await tx.vote.create({ data: { commentId: msgid, visitor: owner } })
         return tx.comment.update({
@@ -176,8 +187,8 @@ export function createApi({ database, config, akismet }: Services) {
   api.get('/kudos/:id', async (c) => {
     const article = articleUrl(c.req.param('id'))
     if (!article) return failure(c, 'Invalid article URL.')
-    const kudos = await database.kudos.findUnique({
-      where: { article: article.href },
+    const kudos = await database.kudos.findFirst({
+      where: { article: { url: article.href } },
       select: { count: true, _count: { select: { members: { where: { visitor: visitor(c) ?? '' } } } } },
     })
     return success(c, { kudos: kudos?.count ?? 0, given: Boolean(kudos?._count.members) })
@@ -186,27 +197,33 @@ export function createApi({ database, config, akismet }: Services) {
   api.post('/kudos', async (c) => {
     const result = kudosInput.safeParse(await requestBody(c))
     if (!result.success) return failure(c, 'Provide an article URL and kudos action.')
-    const url = articleUrl(result.data.id)
-    if (!url) return failure(c, 'Invalid article URL.')
-    if (!allowsWrite(c, url)) return failure(c, 'Kudos are not allowed from this origin.', 403)
+    const requestedArticle = articleUrl(result.data.id)
+    if (!requestedArticle) return failure(c, 'Invalid article URL.')
+    if (!allowsWrite(c, requestedArticle)) return failure(c, 'Kudos are not allowed from this origin.', 403)
 
-    const article = url.href
+    const url = requestedArticle.href
     const owner = writeVisitor(c, config)
     const given = result.data.kudo === 'add'
     const count = await database.$transaction(async (tx) => {
+      const article = given
+        ? await tx.article.upsert({ where: { url }, create: { url }, update: {}, select: { id: true } })
+        : await tx.article.findUnique({ where: { url }, select: { id: true } })
+      if (!article) return 0
+      const articleId = article.id
+
       if (given) {
-        const kudos = await tx.kudos.upsert({ where: { article }, update: {}, create: { article } })
-        const where = { article_visitor: { article, visitor: owner } }
+        const kudos = await tx.kudos.upsert({ where: { articleId }, update: {}, create: { articleId } })
+        const where = { articleId_visitor: { articleId, visitor: owner } }
         if (await tx.kudosMember.findUnique({ where })) return kudos.count
-        await tx.kudosMember.create({ data: { article, visitor: owner } })
-        return (await tx.kudos.update({ where: { article }, data: { count: { increment: 1 } } })).count
+        await tx.kudosMember.create({ data: { articleId, visitor: owner } })
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { increment: 1 } } })).count
       }
 
-      const removed = await tx.kudosMember.deleteMany({ where: { article, visitor: owner } })
+      const removed = await tx.kudosMember.deleteMany({ where: { articleId, visitor: owner } })
       if (removed.count) {
-        return (await tx.kudos.update({ where: { article }, data: { count: { decrement: 1 } } })).count
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { decrement: 1 } } })).count
       }
-      return (await tx.kudos.findUnique({ where: { article } }))?.count ?? 0
+      return (await tx.kudos.findUnique({ where: { articleId } }))?.count ?? 0
     })
     return success(c, { kudos: count, given }, 201)
   })

@@ -10,6 +10,7 @@ import { openDatabase } from '../src/database.js'
 import { commentThreads } from '../src/comments.js'
 import type { Comment } from '../src/generated/prisma/client.js'
 
+const baseline = readFileSync(new URL('../prisma/migrations/20261121010000_initial/migration.sql', import.meta.url), 'utf8')
 const directory = mkdtempSync(join(tmpdir(), 'kucos-test-'))
 const filename = join(directory, 'test.db')
 const database = openDatabase(`file:${filename}`)
@@ -40,7 +41,7 @@ const app = createApp({
 
 before(() => {
   const sqlite = new DatabaseSync(filename)
-  sqlite.exec(readFileSync('prisma/migrations/20261121000000_initial/migration.sql', 'utf8'))
+  sqlite.exec(baseline)
   sqlite.close()
 })
 after(async () => {
@@ -113,6 +114,36 @@ test('counting and removing kudos is idempotent per visitor', async () => {
   assert.equal((await (await app.request(path)).json()).message.kudos, 0)
 })
 
+test('an article URL change keeps its comments and kudos together', async () => {
+  const original = `${site}/original`
+  const moved = `${site}/moved`
+  const posted = await write('/api/comments', { article_url: original, comment: 'An existing comment' })
+  assert.equal(posted.status, 201)
+  const { message: comment } = await posted.json()
+  const reply = await write('/api/comments', { article_url: original, comment: 'An existing reply', parent_id: comment.id })
+  assert.equal(reply.status, 201)
+  const { message: child } = await reply.json()
+  const vote = { msgid: comment.id, action: 'upvote' }
+  assert.equal((await write('/api/comments/vote', vote, otherVisitor)).status, 200)
+  assert.equal((await write('/api/kudos', { id: original, kudo: 'add' })).status, 201)
+
+  const stored = await database.article.findUniqueOrThrow({ where: { url: original } })
+  const updated = await database.article.update({ where: { id: stored.id }, data: { url: moved } })
+  assert.equal(updated.id, stored.id)
+
+  const comments = await app.request(`/api/comments/${encodeURIComponent(moved)}`)
+  const thread = (await comments.json()).comments[comment.id]
+  assert.equal(thread.children[child.id].id, child.id)
+  assert.equal(thread.score, 1)
+  assert.equal((await write('/api/comments/vote', vote, otherVisitor)).status, 400)
+  const kudos = await app.request(`/api/kudos/${encodeURIComponent(moved)}`, {
+    headers: { 'X-Kucos-Visitor': visitor },
+  })
+  assert.deepEqual((await kudos.json()).message, { kudos: 1, given: true })
+  const oldThread = await app.request(`/api/comments/${encodeURIComponent(original)}`)
+  assert.equal((await oldThread.json()).count, 0)
+})
+
 test('holds spam and check failures, supports moderation and revokes admin sessions', async () => {
   const spam = await write('/api/comments', { article_url: article, comment: 'Likely spam' })
   const pending = await write('/api/comments', { article_url: article, comment: 'Unavailable' })
@@ -133,6 +164,9 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
   })
   assert.equal(login.status, 303)
   const cookie = login.headers.get('Set-Cookie')!.split(';')[0]
+  const overview = await app.request('/overview', { headers: { cookie } })
+  assert.equal(overview.status, 200)
+  assert.ok((await overview.text()).includes(`/comments?url=${encodeURIComponent(article)}`))
   const dashboard = await app.request('/spam', { headers: { cookie } })
   assert.equal(dashboard.status, 200)
   assert.match(await dashboard.text(), /Likely spam/)
@@ -159,7 +193,7 @@ test('only registered origins may preflight and post to their own articles', asy
 test('keeps very deep threads serializable without losing replies', () => {
   const now = new Date()
   const sample: Comment = {
-    id: '', article, author: 'Anonymous', content: 'A reply',
+    id: '', articleId: '', author: 'Anonymous', content: 'A reply',
     email: null, website: null, owner: visitor, parentId: null,
     moderation: 'published', pinned: false, likes: 0, dislikes: 0,
     createdAt: now, updatedAt: now, ip: null, userAgent: null,

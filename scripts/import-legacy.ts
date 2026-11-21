@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { decode } from 'he'
@@ -72,6 +73,16 @@ async function importLegacy(directory: string) {
     ['comments', 'votes', 'spams', 'kudos'].map((collection) => rows(directory, collection)),
   )
   const spamIds = new Set(spams.map((row) => objectId(row.comment_id)))
+  const articles = new Map<string, string>()
+  function articleId(value: unknown) {
+    const url = article(value)
+    const known = articles.get(url)
+    if (known) return known
+    const id = randomUUID()
+    articles.set(url, id)
+    return id
+  }
+
   const byId = new Map<string, Comment>()
   const parents = new Map<string, string>()
   for (const row of comments) {
@@ -81,7 +92,7 @@ async function importLegacy(directory: string) {
     const createdAt = date(row.createdOn) ?? new Date(0)
     byId.set(id, {
       id,
-      article: article(row.article_id),
+      articleId: articleId(row.article_id),
       content: text(row.comment),
       author: decode(text(row.author)) || 'Anonymous',
       email: decode(text(row.email)) || null,
@@ -99,7 +110,7 @@ async function importLegacy(directory: string) {
   }
 
   for (const [child, parent] of parents) {
-    if (!byId.has(parent) || byId.get(child)?.article !== byId.get(parent)?.article) {
+    if (!byId.has(parent) || byId.get(child)?.articleId !== byId.get(parent)?.articleId) {
       parents.delete(child)
     }
   }
@@ -127,18 +138,19 @@ async function importLegacy(directory: string) {
   }
   const counts = new Map<string, number>()
   for (const row of kudos) {
-    const url = article(row.article_id)
-    counts.set(url, integer((counts.get(url) ?? 0) + Math.max(0, integer(row.kudos))))
+    const id = articleId(row.article_id)
+    counts.set(id, integer((counts.get(id) ?? 0) + Math.max(0, integer(row.kudos))))
   }
 
   const database = openDatabase()
   try {
     await database.$transaction(async (tx) => {
-      if (await tx.comment.count() || await tx.kudos.count()) throw new Error('The destination database already contains comments or kudos.')
+      if (await tx.article.count()) throw new Error('The destination database already contains articles.')
+      await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })) })
       await tx.comment.createMany({ data: [...byId.values()] })
       for (const [id, parentId] of parents) await tx.comment.update({ where: { id }, data: { parentId } })
       await tx.vote.createMany({ data: [...uniqueVotes.values()] })
-      await tx.kudos.createMany({ data: [...counts].map(([article, count]) => ({ article, count })) })
+      await tx.kudos.createMany({ data: [...counts].map(([articleId, count]) => ({ articleId, count })) })
     }, { timeout: 120000 })
     console.log(`Imported ${byId.size} comments, ${uniqueVotes.size} vote records, and kudos totals for ${counts.size} articles.`)
   } finally {

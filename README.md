@@ -28,6 +28,8 @@ Add the site's origin to the comma-separated `ALLOWED_ORIGINS` list in `.env`. S
 
 Kucos uses the current page URL for the thread and strips its own comment permalinks from that URL. To share a thread across several URLs, set `data-article` on the container to a canonical URL on the same origin.
 
+Each article has a stable ID. If a page moves, update its existing `Article.url` to the new canonical URL. The comments, votes, and kudos follow the article.
+
 Visitors can reply, quote selected text, collapse replies, vote once per comment, and toggle kudos. They can edit their own comments for an hour. The widget keeps an anonymous identifier in the embedding site's browser storage, so edits and undoing kudos work when third-party cookies are blocked. Names, emails, and website links are optional. Emails stay out of the public API.
 
 Comments support Markdown, including links, quotes, strikethrough, and fenced code with syntax highlighting. Start a line with `! ` for a spoiler. Use `:"quoted text":` for an inline quote.

@@ -3,6 +3,8 @@ import type { Comment } from './generated/prisma/client.js'
 import { safeUrl } from './http.js'
 import { renderMarkdown } from './markdown.js'
 
+export type CommentWithArticle = Comment & { article: { url: string } }
+
 export const EDIT_WINDOW = 60 * 60 * 1000
 const MAX_THREAD_DEPTH = 32
 
