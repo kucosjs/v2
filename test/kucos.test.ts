@@ -1,20 +1,24 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
 import { createApp } from '../src/app.js'
 import { openDatabase } from '../src/database.js'
 import { commentThreads } from '../src/comments.js'
 import { renderMarkdown } from '../src/markdown.js'
 import type { Comment } from '../src/generated/prisma/client.js'
+import { startGunRelay } from './gun-relay.js'
 
 const migrations = new URL('../prisma/migrations/', import.meta.url)
 const directory = mkdtempSync(join(tmpdir(), 'kucos-test-'))
 const filename = join(directory, 'test.db')
-const database = openDatabase(`file:${filename}`)
+const useGun = process.argv.includes('--gun')
+let relay = useGun ? await startGunRelay(directory) : undefined
+const database = openDatabase(
+  relay ? `${relay.peer.replace('ws:', 'http:')},${relay.peer}` : `file:${filename}`,
+)
 const article = 'https://site.example/notes/100%25?next=%2F'
 const site = new URL(article).origin
 const visitor = randomUUID()
@@ -43,7 +47,12 @@ const app = createApp({
   },
 })
 
-before(() => {
+before(async () => {
+  if (relay) {
+    await database.$connect()
+    return
+  }
+  const { DatabaseSync } = await import('node:sqlite')
   const sqlite = new DatabaseSync(filename)
   const directories = readdirSync(migrations, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -55,8 +64,12 @@ before(() => {
   sqlite.close()
 })
 after(async () => {
-  await database.$disconnect()
-  rmSync(directory, { recursive: true, force: true })
+  try {
+    await database.$disconnect()
+  } finally {
+    await relay?.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 function write(path: string, body: object, user = visitor, method = 'POST', origin = site) {
@@ -341,12 +354,20 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
     ).status,
     403,
   )
-  assert.equal(
-    (await app.request(`/notspam/${comment.id}`, { method: 'PATCH', headers: { cookie } })).status,
-    200,
-  )
+  const moderate = (id: string, action: string, view = 'spam') =>
+    app.request(`/moderate/${id}`, {
+      method: 'POST',
+      headers: { cookie, Origin: config.publicUrl },
+      body: new URLSearchParams({ action, view }),
+    })
+  assert.equal((await moderate(comment.id, 'approve')).status, 303)
   assert.deepEqual(feedback, ['submit-ham'])
   assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 200)
+  assert.equal((await moderate(comment.id, 'spam', 'comments')).status, 303)
+  assert.equal((await moderate(comment.id, 'delete')).status, 303)
+  assert.equal((await moderate(pendingComment.id, 'approve')).status, 303)
+  assert.deepEqual(feedback, ['submit-ham', 'submit-spam'])
+  assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 404)
   assert.equal((await app.request('/logout', { method: 'POST', headers: { cookie } })).status, 303)
   assert.equal((await app.request('/spam', { headers: { cookie } })).status, 302)
 })
@@ -481,3 +502,45 @@ test('keeps very deep threads serializable without losing replies', () => {
   const payload = JSON.stringify(roots)
   assert.equal(payload.match(/"id":/g)?.length, comments.length)
 })
+
+test('the demo uses a stable article URL across section links', async () => {
+  const response = await app.request('/demo')
+  assert.equal(response.status, 200)
+  const html = await response.text()
+  assert.ok(html.includes(`id="kucos-comments" data-article="${config.publicUrl}/demo"`))
+  assert.ok(html.includes('href="#discussion"'))
+})
+
+test('a failed transaction rolls back its changes', async () => {
+  const url = `${site}/rolled-back`
+  await assert.rejects(
+    database.$transaction(async (tx) => {
+      await tx.article.create({ data: { url } })
+      throw new Error('Notification failed')
+    }),
+    /Notification failed/,
+  )
+  assert.equal(await database.article.findUnique({ where: { url } }), null)
+})
+
+if (useGun) {
+  test('Gun restores comments, votes, and kudos after the relay restarts', async () => {
+    await database.$disconnect()
+    await relay?.close()
+    relay = await startGunRelay(directory)
+    const restored = openDatabase(relay.peer.replace('ws:', 'http:'))
+    try {
+      const saved = await restored.article.findUniqueOrThrow({ where: { url: `${site}/moved` } })
+      const comments = await restored.comment.findMany({ where: { articleId: saved.id } })
+      assert.equal(comments.length, 2)
+      assert.equal(comments.find((comment) => comment.parentId === null)?.likes, 1)
+      assert.equal(
+        (await restored.kudos.findUniqueOrThrow({ where: { articleId: saved.id } })).count,
+        1,
+      )
+      assert.equal(existsSync(filename), false)
+    } finally {
+      await restored.$disconnect()
+    }
+  })
+}

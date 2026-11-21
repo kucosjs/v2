@@ -3,7 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./index.js",
-  "exports": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./records": {
+      "types": "./records.d.ts",
+      "default": "./records.js"
+    }
+  },
   "dependencies": {
     "@prisma/driver-adapter-utils": "^7.0.0",
     "gun": "^0.2020.1240"
