@@ -20,6 +20,13 @@ function origin(value: string) {
   return url.origin
 }
 
+export function webUrl(input) {
+  if (typeof input !== 'string' || input.length > 2000 || !URL.canParse(input)) return undefined;
+  const url = new URL(input);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return undefined;
+  return url;
+}
+
 export function readConfig() {
   const publicUrl = origin(process.env.PUBLIC_URL || `http://localhost:${port}`)
   const allowedOrigins = new Set([
