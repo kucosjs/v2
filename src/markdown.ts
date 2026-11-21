@@ -1,9 +1,6 @@
-import highlightCommon = require('highlight.js/lib/common')
-
+import highlight from 'highlight.js/lib/common'
 import { Marked } from 'marked'
 import { safeUrl } from './http.js'
-
-const highlight = highlightCommon.default
 
 const entities: Record<string, string> = {
   '&': '&amp;',
