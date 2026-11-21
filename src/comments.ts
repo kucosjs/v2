@@ -28,7 +28,9 @@ export function canEdit(comment: Comment, owner?: string) {
   return owner === comment.owner && Date.now() - comment.createdAt.getTime() <= EDIT_WINDOW
 }
 
-export function publicComment(comment: Comment, owner?: string) {
+type CommentWithViewerVote = Comment & { _count?: { votes: number } }
+
+export function publicComment(comment: CommentWithViewerVote, owner?: string) {
   const hidden = comment.moderation !== 'published'
   return {
     id: comment.id,
@@ -48,12 +50,13 @@ export function publicComment(comment: Comment, owner?: string) {
     spam: Number(hidden),
     sticky: Number(!hidden && comment.pinned),
     editable: canEdit(comment, owner),
+    voted: !hidden && Boolean(comment._count?.votes),
   }
 }
 
 type Thread = ReturnType<typeof publicComment> & { children: Record<string, Thread> }
 
-export function commentThreads(comments: Comment[], owner?: string) {
+export function commentThreads(comments: CommentWithViewerVote[], owner?: string) {
   const roots: Record<string, Thread> = Object.create(null)
   const nodes = new Map<string, Thread>()
   for (const comment of comments) {

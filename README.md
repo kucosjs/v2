@@ -22,11 +22,11 @@ For production, run `npm run build` and then `npm start`. The build uses esbuild
 Add the site's origin to the comma-separated `ALLOWED_ORIGINS` list in `.env`. Set `PUBLIC_URL` to your Kucos server's public HTTPS origin for production, then use that origin in the snippet.
 
 ```html
-<div id="comments"></div>
+<div id="kucos-comments"></div>
 <script src="http://localhost:3000/min/kucos.min.js" defer></script>
 ```
 
-Kucos uses the current page URL for the thread and strips its own comment permalinks from that URL. To share a thread across several URLs, set `data-article` on the container to a canonical URL on the same origin.
+Kucos uses the current page URL for the thread and strips its own comment permalinks from that URL. For multiple embeds, use `data-kucos` on each container. Set `data-article` to a canonical URL on the same origin to share a thread across pages.
 
 Visitors can reply, quote selected text, collapse replies, vote once per comment, and toggle kudos. They can edit their own comments for an hour. The widget keeps an anonymous identifier in the embedding site's browser storage, so edits and undoing kudos work when third-party cookies are blocked. Names, emails, and website links are optional. Emails stay out of the public API.
 

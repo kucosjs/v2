@@ -144,14 +144,22 @@ export function createApi({ database, config, akismet }: Services) {
     return success(c, comment.content)
   })
 
+  api.get('/comments/edit/:id', async (c) => {
+    const entry = await database.comment.findUnique({ where: { id: c.req.param('id') } })
+    if (!entry || !canEdit(entry, visitor(c))) return failure(c, 'Comment not found or no longer editable.', 404)
+    return success(c, { comment: entry.content, author: entry.author, email: entry.email, website: entry.website })
+  })
+
   api.get('/comments/:id', async (c) => {
     const article = articleUrl(c.req.param('id'))
     if (!article) return failure(c, 'Invalid article URL.')
+    const owner = visitor(c)
     const comments = await database.comment.findMany({
       where: { article: { url: article.href } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      include: { _count: { select: { votes: { where: { visitor: owner ?? '' } } } } },
     })
-    return c.json({ count: comments.length, comments: commentThreads(comments, visitor(c)) })
+    return c.json({ count: comments.length, comments: commentThreads(comments, owner) })
   })
 
   api.post('/comments/vote', async (c) => {

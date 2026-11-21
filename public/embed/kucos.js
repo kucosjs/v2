@@ -4,13 +4,8 @@
   const server = new URL(script.src).origin;
 
   function start() {
-    const mounts = document.querySelectorAll('#comments, [data-kucos]');
+    const mounts = document.querySelectorAll('#kucos-comments, [data-kucos]');
     if (!mounts.length) return;
-
-    const style = document.createElement('link');
-    style.rel = 'stylesheet';
-    style.href = new URL('/min/kucos.min.css', server).href;
-    document.head.append(style);
 
     const key = `kucos:visitor:${server}`;
     let token;
@@ -75,25 +70,43 @@
 
   function widget(mount, article, api) {
     const encoded = encodeURIComponent(article);
+    const host = element('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const style = element('link');
+    style.rel = 'stylesheet';
+    style.href = new URL('/min/kucos.min.css', server).href;
     const root = element('section', 'kucos');
-    root.setAttribute('aria-label', 'Kucos comments');
-    const heading = element('h2', 'kucos-heading', 'Comments');
+    root.setAttribute('aria-label', 'Comments and kudos');
+    const heading = element('h2', 'kucos-heading', 'Discussion');
+    const countBadge = element('span', 'kucos-count');
+    const title = element('div', 'kucos-title');
+    title.append(heading, countBadge);
     const notice = element('p', 'kucos-status');
     notice.setAttribute('role', 'status');
-    const thread = element('ul', 'kucos-thread');
-    const kudo = button('♥  Kudos', toggleKudos, 'kucos-kudos');
+    const thread = element('div', 'kucos-discussion');
+    const kudo = button('', toggleKudos, 'kucos-kudos');
+    const heart = element('span', 'kucos-heart', '♥');
+    heart.setAttribute('aria-hidden', 'true');
+    const kudoCount = element('span');
+    kudo.append(heart, element('span', '', 'Kudos'), kudoCount);
     kudo.setAttribute('aria-pressed', 'false');
     kudo.disabled = true;
-    const bar = element('div', 'kucos-bar');
-    bar.append(heading, kudo);
-    root.append(bar, commentForm(), notice, thread);
-    mount.replaceChildren(root);
+    const bar = element('header', 'kucos-bar');
+    bar.append(title, kudo);
+    const footer = element('footer', 'kucos-footer');
+    const credit = itemLink('Comments by Kucos', new URL('/demo', server));
+    credit.className = 'credit';
+    credit.append(element('span', '', '.'));
+    footer.append(credit);
+    root.append(bar, commentForm(), notice, thread, footer);
+    shadow.append(style, root);
+    mount.replaceChildren(host);
     let given = false;
 
     function updateKudos(result) {
       given = result.given;
       kudo.setAttribute('aria-pressed', String(given));
-      kudo.textContent = `♥  ${result.kudos} Kudos`;
+      kudoCount.textContent = result.kudos;
     }
 
     async function toggleKudos() {
@@ -113,38 +126,57 @@
       status.textContent = error instanceof Error ? error.message : 'Kucos could not complete the request.';
     }
 
+    function focusComment(id) {
+      const target = shadow.getElementById(id);
+      if (!target) return;
+      for (let parent = target.parentElement; parent && parent !== thread; parent = parent.parentElement) {
+        if (parent.tagName === 'DETAILS') parent.open = true;
+      }
+      target.scrollIntoView({ block: 'nearest' });
+      target.focus({ preventScroll: true });
+    }
+
+    function focusPermalink() {
+      if (location.hash.startsWith('#comment-')) focusComment(location.hash.slice(1));
+    }
+
+    window.addEventListener('hashchange', focusPermalink);
+
     async function refresh(focusId) {
+      thread.setAttribute('aria-busy', 'true');
       try {
         const { count, comments } = await api(`/api/comments/${encoded}`);
-        heading.textContent = `${count} ${count === 1 ? 'comment' : 'comments'}`;
+        countBadge.textContent = count;
+        countBadge.setAttribute('aria-label', `${count} ${count === 1 ? 'comment' : 'comments'}`);
         const nodes = renderThread(comments);
-        thread.replaceChildren(...nodes);
-        thread.hidden = !nodes.length;
-        if (location.hash.startsWith('#comment-') && !focusId) {
-          document.getElementById(location.hash.slice(1))?.scrollIntoView();
-        }
-        if (focusId) {
-          const target = document.getElementById(`comment-${focusId}`);
-          if (target) {
-            target.tabIndex = -1;
-            target.focus();
-          }
-        }
+        const list = element('ul', 'kucos-thread');
+        list.append(...nodes);
+        thread.replaceChildren(nodes.length ? list : element('p', 'kucos-empty', 'No comments yet.'));
+        if (focusId) focusComment(`comment-${focusId}`);
+        else focusPermalink();
       } catch (error) {
         showError(notice, error);
+        thread.replaceChildren(button('Try again', () => {
+          notice.textContent = '';
+          void refresh();
+        }, 'kucos-quiet'));
+      } finally {
+        thread.setAttribute('aria-busy', 'false');
       }
     }
 
-    function commentForm({ parentId, edit, text = '', close } = {}) {
+    function commentForm({ parentId, draft, text = '', close } = {}) {
+      const edit = Boolean(draft);
       const form = element('form', 'kucos-form');
       const label = element('label', 'kucos-input', edit ? 'Edit comment' : parentId ? 'Your reply' : 'Your comment');
       const field = element('textarea');
       field.name = 'comment';
-      field.rows = 4;
+      field.rows = 3;
       field.required = true;
       field.minLength = 4;
       field.maxLength = 4999;
-      field.value = text;
+      field.placeholder = parentId && !edit ? 'Write your reply…' : 'Join the discussion…';
+      field.value = draft?.comment ?? text;
       label.append(field);
       form.append(label);
 
@@ -163,26 +195,26 @@
           field.focus();
         }));
       }
-      form.prepend(formats);
+      const formatting = element('details', 'kucos-formatting');
+      formatting.append(element('summary', '', 'Markdown formatting'), formats);
 
-      if (!edit) {
-        const details = element('details', 'kucos-details');
-        details.append(element('summary', '', 'Add a name, email, or website'));
-        const optional = element('div', 'kucos-optional');
-        for (const [name, caption, type] of [
-          ['author', 'Name', 'text'], ['email', 'Email (private)', 'email'], ['website', 'Website', 'url'],
-        ]) {
-          const label = element('label', 'kucos-input', caption);
-          const input = element('input');
-          input.name = name;
-          input.type = type;
-          input.maxLength = 1000;
-          label.append(input);
-          optional.append(label);
-        }
-        details.append(optional);
-        form.append(details);
+      const details = element('details', 'kucos-details');
+      details.append(element('summary', '', edit ? 'Edit name, website, or email' : 'Add a name, website, or email'));
+      const optional = element('div', 'kucos-optional');
+      for (const [name, caption, type] of [
+        ['author', 'Name', 'text'], ['website', 'Website', 'url'], ['email', 'Email (private)', 'email'],
+      ]) {
+        const label = element('label', 'kucos-input', caption);
+        const input = element('input');
+        input.name = name;
+        input.type = type;
+        input.maxLength = 1000;
+        input.value = draft?.[name] ?? '';
+        label.append(input);
+        optional.append(label);
       }
+      details.append(optional);
+      form.append(details);
 
       const trap = element('input');
       trap.name = 'username';
@@ -196,10 +228,10 @@
       submit.type = 'submit';
       const status = element('span', 'kucos-status');
       status.setAttribute('role', 'status');
+      controls.append(formatting);
+      if (close) controls.append(button('Cancel', close, 'kucos-quiet'));
       controls.append(submit);
-      if (close) controls.append(button('Cancel', close));
-      controls.append(status);
-      form.append(controls);
+      form.append(controls, status);
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -228,6 +260,7 @@
       return Object.values(comments).sort((a, b) => b.sticky - a.sticky).map((comment) => {
         const node = element('li', 'kucos-entry');
         node.id = `comment-${comment.id}`;
+        node.tabIndex = -1;
         const meta = element('div', 'kucos-meta');
         const author = element('strong', '', comment.authorText);
         if (comment.website) {
@@ -241,7 +274,10 @@
         const stamp = element('time', '', comment.created);
         stamp.dateTime = comment.createdOn;
         stamp.title = comment.createdOnTime;
-        const permalink = itemLink('', `#comment-${comment.id}`);
+        const permalink = itemLink('', new URL(`#comment-${comment.id}`, location.href));
+        permalink.addEventListener('click', () => {
+          if (location.hash === permalink.hash) focusComment(node.id);
+        });
         permalink.append(stamp);
         meta.append(author, permalink);
         if (comment.sticky) meta.append(element('span', 'kucos-tag', 'Pinned'));
@@ -255,7 +291,7 @@
         const actions = element('div', 'kucos-controls');
         const status = element('span', 'kucos-status');
         status.setAttribute('role', 'status');
-        const followUp = element('div');
+        const followUp = element('div', 'kucos-inline-editor');
         node.append(actions, followUp);
 
         function openForm(options) {
@@ -278,26 +314,34 @@
               up.disabled = down.disabled = false;
             }
           };
-          const up = button('↑', () => vote('upvote'));
-          const down = button('↓', () => vote('downvote'));
+          const up = button('↑', () => vote('upvote'), 'kucos-quiet');
+          const down = button('↓', () => vote('downvote'), 'kucos-quiet');
+          up.disabled = down.disabled = comment.voted;
           up.setAttribute('aria-label', 'Upvote');
           down.setAttribute('aria-label', 'Downvote');
-          actions.append(up, score, down, button('Reply', () => {
-            const selection = window.getSelection();
-            const selected = content.contains(selection?.anchorNode) && content.contains(selection?.focusNode)
-              ? String(selection).trim() : '';
+          function selectedText() {
+            const selection = shadow.getSelection?.() ?? window.getSelection();
+            return content.contains(selection?.anchorNode) && content.contains(selection?.focusNode)
+              ? String(selection).trim().slice(0, 2000) : '';
+          }
+          let quote = '';
+          const reply = button('Reply', () => {
+            const selected = quote || selectedText();
+            quote = '';
             openForm({ text: selected ? selected.split('\n').map((line) => `> ${line}`).join('\n') + '\n\n' : '' });
-          }));
+          }, 'kucos-quiet');
+          reply.addEventListener('pointerdown', () => { quote = selectedText(); });
+          actions.append(up, score, down, reply);
         }
         if (comment.editable) {
           actions.append(button('Edit', async () => {
             try {
-              const { message } = await api(`/api/comments/row/${comment.id}`);
-              openForm({ edit: true, text: message });
+              const { message } = await api(`/api/comments/edit/${comment.id}`);
+              openForm({ draft: message });
             } catch (error) {
               showError(status, error);
             }
-          }));
+          }, 'kucos-quiet'));
         }
         actions.append(status);
 

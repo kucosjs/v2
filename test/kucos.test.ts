@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createApp } from '../src/app.js'
 import { openDatabase } from '../src/database.js'
 import { commentThreads } from '../src/comments.js'
+import { renderMarkdown } from '../src/markdown.js'
 import type { Comment } from '../src/generated/prisma/client.js'
 
 const migrations = new URL('../prisma/migrations/', import.meta.url)
@@ -74,6 +75,12 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   assert.match(comment.comment, /<strong>Hello<\/strong>/)
   assert.doesNotMatch(comment.comment, /<script>|href="javascript:/)
   assert.equal(comment.email, undefined)
+  const draftPath = `/api/comments/edit/${comment.id}`
+  const ownerHeaders = { 'X-Kucos-Visitor': visitor }
+  assert.equal((await app.request(draftPath, { headers: { 'X-Kucos-Visitor': otherVisitor } })).status, 404)
+  const draft = await app.request(draftPath, { headers: ownerHeaders })
+  assert.equal(draft.status, 200)
+  assert.equal((await draft.json()).message.email, 'author@example.test')
 
   const replied = await write('/api/comments', {
     article_url: article, comment: 'A reply', parent_id: comment.id,
@@ -93,6 +100,7 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
     article_url: article, comment: 'Updated text', parent_id: comment.id,
   }, visitor, 'PATCH')).status, 200)
   await database.comment.update({ where: { id: comment.id }, data: { createdAt: new Date(0) } })
+  assert.equal((await app.request(draftPath, { headers: ownerHeaders })).status, 404)
   assert.equal((await write('/api/comments', {
     article_url: article, comment: 'Trying after expiry', parent_id: comment.id,
   }, visitor, 'PATCH')).status, 403)
@@ -101,6 +109,19 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   const responses = await Promise.all([write('/api/comments/vote', vote, otherVisitor), write('/api/comments/vote', vote, otherVisitor)])
   assert.deepEqual(responses.map(({ status }) => status).sort(), [200, 400])
   assert.equal((await database.comment.findUniqueOrThrow({ where: { id: comment.id } })).likes, 1)
+  const voterThread = await app.request(path, { headers: { 'X-Kucos-Visitor': otherVisitor } })
+  assert.equal((await voterThread.json()).comments[comment.id].voted, true)
+  const authorThread = await app.request(path, { headers: ownerHeaders })
+  assert.equal((await authorThread.json()).comments[comment.id].voted, false)
+})
+
+test('Marked preserves legacy spoilers, inline quotes and links', () => {
+  const html = renderMarkdown('!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).')
+  assert.match(html, /<details[^>]*>.*<strong>hidden<\/strong>/s)
+  assert.match(html, /<br>\s*next line/)
+  assert.match(html, /<q>quote<\/q>/)
+  assert.match(html, /href="\/guide"/)
+  assert.doesNotMatch(renderMarkdown('![remote](https://example.test/image.png)'), /<img/)
 })
 
 test('counting and removing kudos is idempotent per visitor', async () => {

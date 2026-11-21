@@ -132,8 +132,8 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
     <>
       <h1>Comments and kudos for static sites</h1>
       <p class="muted">Add the Kucos widget to any page on a registered site.</p>
-      <pre class="snippet"><code>{`<div id="comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
-      <div id="comments"></div>
+      <pre class="snippet"><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
+      <div id="kucos-comments"></div>
       <script src="/min/kucos.min.js" defer></script>
     </>
   )
