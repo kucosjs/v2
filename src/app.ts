@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getRequestListener } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { createAdmin } from './admin.js'
@@ -57,3 +58,8 @@ export function createApp({
   app.route('/', createAdmin(database, config, akismet))
   return app
 }
+
+export default getRequestListener(async (request, env) => {
+  const { default: app } = await import('./index.js')
+  return app.fetch(request, env)
+})
