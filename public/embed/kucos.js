@@ -94,8 +94,10 @@
     const bar = element('header', 'kucos-bar');
     bar.append(title, kudo);
     const footer = element('footer', 'kucos-footer');
-    const credit = itemLink('Comments by Kucos', new URL('/demo', server));
+    const credit = itemLink('Comments by Kucos', 'https://github.com/kucosjs/v2');
     credit.className = 'credit';
+    credit.target = '_blank';
+    credit.rel = 'noopener noreferrer';
     credit.append(element('span', '', '.'));
     footer.append(credit);
     root.append(bar, commentForm(), notice, thread, footer);
@@ -181,6 +183,7 @@
       form.append(label);
 
       const formats = element('div', 'kucos-tools');
+      formats.setAttribute('role', 'group');
       formats.setAttribute('aria-label', 'Markdown formatting');
       for (const [name, before, after] of [
         ['Bold', '**', '**'], ['Italic', '_', '_'], ['Quote', '> ', ''],
@@ -195,8 +198,7 @@
           field.focus();
         }));
       }
-      const formatting = element('details', 'kucos-formatting');
-      formatting.append(element('summary', '', 'Markdown formatting'), formats);
+      form.prepend(formats);
 
       const details = element('details', 'kucos-details');
       details.append(element('summary', '', edit ? 'Edit name, website, or email' : 'Add a name, website, or email'));
@@ -228,7 +230,6 @@
       submit.type = 'submit';
       const status = element('span', 'kucos-status');
       status.setAttribute('role', 'status');
-      controls.append(formatting);
       if (close) controls.append(button('Cancel', close, 'kucos-quiet'));
       controls.append(submit);
       form.append(controls, status);

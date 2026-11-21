@@ -77,9 +77,7 @@ button:disabled { cursor: default; opacity: .6; }
 .kucos-optional { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .6rem; margin-top: .6rem; }
 summary { cursor: pointer; font-size: .9em; color: #46566e; }
 .kucos-form > .kucos-controls { justify-content: flex-end; gap: .65rem; margin-top: .85rem; }
-.kucos-formatting { margin-inline-end: auto; }
-.kucos-formatting summary { color: var(--muted); }
-.kucos-tools { padding-top: .35rem; }
+.kucos-tools { margin-block-end: .6rem; }
 .kucos-tools button, .kucos-quiet {
   padding: .25rem .5rem;
   border: 1px solid transparent;
@@ -89,6 +87,7 @@ summary { cursor: pointer; font-size: .9em; color: #46566e; }
   font-size: .88em;
   font-weight: 650;
 }
+.kucos-tools button { background: #f9fbfd; border-color: var(--line); }
 .kucos-tools button:hover, .kucos-quiet:not(:disabled):hover { background: var(--soft); border-color: #d6dee8; }
 .kucos-submit {
   min-height: 41px;
