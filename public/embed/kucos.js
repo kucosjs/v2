@@ -68,6 +68,10 @@
     return link;
   }
 
+  function formatScore(score) {
+    return `${score} ${Math.abs(score) === 1 ? 'point' : 'points'}`;
+  }
+
   function widget(mount, article, api) {
     const encoded = encodeURIComponent(article);
     const host = element('div');
@@ -129,13 +133,13 @@
       status.textContent = error instanceof Error ? error.message : 'Kucos could not complete the request.';
     }
 
-    function focusComment(target, block = 'nearest') {
+    function focusComment(target) {
       if (!target) return;
       for (let parent = target.parentElement; parent && parent !== thread; parent = parent.parentElement) {
         if (parent.tagName === 'DETAILS') parent.open = true;
       }
       target.focus({ preventScroll: true });
-      target.scrollIntoView({ block, inline: 'nearest' });
+      target.scrollIntoView({ block: 'start', inline: 'nearest' });
     }
 
     function focusPermalink(hash = location.hash, moveFocus = true) {
@@ -146,12 +150,17 @@
         target?.classList.add('kucos-highlight');
         highlightedComment = target;
       }
-      if (moveFocus) focusComment(target, 'start');
+      if (moveFocus) focusComment(target);
     }
 
     window.addEventListener('hashchange', () => focusPermalink());
 
-    async function refresh(focusId) {
+    function showSubmissionNotice(text) {
+      notice.textContent = text;
+      notice.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+
+    async function refresh(submission) {
       thread.setAttribute('aria-busy', 'true');
       try {
         const { count, comments } = await api(`/api/comments/${encoded}`);
@@ -161,13 +170,25 @@
         const list = element('ul', 'kucos-thread');
         list.append(...nodes);
         thread.replaceChildren(nodes.length ? list : element('p', 'kucos-empty', 'No comments yet.'));
-        focusPermalink(location.hash, !focusId);
-        if (focusId) focusComment(shadow.getElementById(`comment-${focusId}`));
+        focusPermalink(location.hash, !submission);
+        if (submission) {
+          const target = submission.id && shadow.getElementById(`comment-${submission.id}`);
+          if (target) {
+            const confirmation = element('p', 'kucos-confirmation', submission.text);
+            confirmation.id = `${target.id}-confirmation`;
+            target.setAttribute('aria-describedby', confirmation.id);
+            target.prepend(confirmation);
+            focusComment(target);
+          } else {
+            showSubmissionNotice(submission.text);
+          }
+        }
       } catch (error) {
-        showError(notice, error);
+        if (submission) showSubmissionNotice(`${submission.text} The discussion couldn't reload.`);
+        else showError(notice, error);
         thread.replaceChildren(button('Try again', () => {
           notice.textContent = '';
-          void refresh();
+          void refresh(submission);
         }, 'kucos-quiet'));
       } finally {
         thread.setAttribute('aria-busy', 'false');
@@ -205,7 +226,7 @@
           field.focus();
         }));
       }
-      form.prepend(formats);
+      form.append(formats);
 
       const details = element('details', 'kucos-details');
       details.append(element('summary', '', edit ? 'Edit name, website, or email' : 'Add a name, website, or email'));
@@ -223,7 +244,6 @@
         optional.append(label);
       }
       details.append(optional);
-      form.append(details);
 
       const trap = element('input');
       trap.name = 'username';
@@ -239,7 +259,9 @@
       status.setAttribute('role', 'status');
       if (close) controls.append(button('Cancel', close, 'kucos-quiet'));
       controls.append(submit);
-      form.append(controls, status);
+      const footer = element('div', 'kucos-form-footer');
+      footer.append(details, controls);
+      form.append(footer, status);
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -251,9 +273,10 @@
           });
           form.reset();
           status.textContent = '';
-          notice.textContent = message.spam ? 'Your comment is awaiting moderation.' : edit ? 'Comment updated.' : 'Comment posted.';
+          notice.textContent = '';
+          const confirmation = message.spam ? 'Your comment was flagged for review.' : edit ? 'Comment updated.' : 'Comment posted.';
           close?.();
-          await refresh(message.id);
+          await refresh({ id: message.id, text: confirmation });
         } catch (error) {
           showError(status, error);
         } finally {
@@ -267,10 +290,13 @@
     function renderThread(comments) {
       return Object.values(comments).sort((a, b) => b.sticky - a.sticky).map((comment) => {
         const node = element('li', 'kucos-entry');
-        const card = element('article', 'kucos-comment');
+        const card = element('article', comment.spam ? 'kucos-comment kucos-comment-flagged' : 'kucos-comment');
         card.id = `comment-${comment.id}`;
         card.tabIndex = -1;
         const meta = element('div', 'kucos-meta');
+        const [initial] = comment.authorText.trim();
+        const avatar = element('span', 'kucos-avatar', initial?.toUpperCase() || '?');
+        avatar.setAttribute('aria-hidden', 'true');
         const author = element('strong', '', comment.authorText);
         if (comment.website) {
           const url = new URL(comment.website);
@@ -294,17 +320,27 @@
           focusPermalink(permalink.hash);
         });
         permalink.append(stamp);
-        meta.append(author, permalink);
-        if (comment.sticky) meta.append(element('span', 'kucos-tag', 'Pinned'));
-        if (comment.edited) meta.append(element('span', 'kucos-tag', 'Edited'));
+        const commentInfo = element('div', 'kucos-comment-info');
+        const byline = element('div', 'kucos-byline');
+        byline.append(author);
+        if (comment.sticky) byline.append(element('span', 'kucos-tag kucos-pinned', 'Pinned'));
+        if (comment.spam) byline.append(element('span', 'kucos-tag kucos-flagged', 'Flagged'));
+        if (comment.edited) byline.append(element('span', 'kucos-tag', 'Edited'));
+        const commentDetails = element('div', 'kucos-comment-details');
+        commentDetails.append(permalink);
+        commentInfo.append(byline, commentDetails);
+        meta.append(avatar, commentInfo);
         const content = element('div', 'kucos-content');
-        if (comment.spam) content.textContent = 'Awaiting moderation.';
-        else content.innerHTML = comment.comment;
-        const actions = element('div', 'kucos-controls');
-        const status = element('span', 'kucos-status');
+        const actions = element('div', 'kucos-controls kucos-comment-actions');
+        const status = element('div', 'kucos-status');
         status.setAttribute('role', 'status');
         const followUp = element('div', 'kucos-inline-editor');
-        card.append(meta, content, actions, followUp);
+        card.append(meta);
+        if (!comment.spam) {
+          content.innerHTML = comment.comment;
+          card.append(content);
+        }
+        card.append(status, followUp);
         node.append(card);
 
         function openForm(options) {
@@ -313,25 +349,30 @@
         }
 
         if (!comment.spam) {
-          const score = element('span', 'kucos-score', String(comment.score));
-          score.setAttribute('aria-label', `Score ${comment.score}`);
+          const votes = element('div', 'kucos-votes');
+          const score = element('span', 'kucos-score', formatScore(comment.score));
+          score.setAttribute('aria-live', 'polite');
+          const separator = element('span', '', '·');
+          separator.setAttribute('aria-hidden', 'true');
+          commentDetails.prepend(score, separator);
           const vote = async (action) => {
             up.disabled = down.disabled = true;
             try {
               const { message } = await api('/api/comments/vote', 'POST', { msgid: comment.id, action });
-              score.textContent = message.score;
-              score.setAttribute('aria-label', `Score ${message.score}`);
+              score.textContent = formatScore(message.score);
               status.textContent = '';
             } catch (error) {
               showError(status, error);
               up.disabled = down.disabled = false;
             }
           };
-          const up = button('↑', () => vote('upvote'), 'kucos-quiet');
-          const down = button('↓', () => vote('downvote'), 'kucos-quiet');
+          const up = button('', () => vote('upvote'), 'kucos-vote kucos-vote-up');
+          const down = button('', () => vote('downvote'), 'kucos-vote');
           up.disabled = down.disabled = comment.voted;
           up.setAttribute('aria-label', 'Upvote');
           down.setAttribute('aria-label', 'Downvote');
+          votes.append(up, down);
+          meta.append(votes);
           function selectedText() {
             const selection = shadow.getSelection?.() ?? window.getSelection();
             return content.contains(selection?.anchorNode) && content.contains(selection?.focusNode)
@@ -344,7 +385,7 @@
             openForm({ text: selected ? selected.split('\n').map((line) => `> ${line}`).join('\n') + '\n\n' : '' });
           }, 'kucos-quiet');
           reply.addEventListener('pointerdown', () => { quote = selectedText(); });
-          actions.append(up, score, down, reply);
+          actions.append(reply);
         }
         if (comment.editable) {
           actions.append(button('Edit', async () => {
@@ -356,7 +397,7 @@
             }
           }, 'kucos-quiet'));
         }
-        actions.append(status);
+        meta.append(actions);
 
         const replies = renderThread(comment.children);
         if (replies.length) {

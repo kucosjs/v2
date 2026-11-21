@@ -68,6 +68,9 @@ The import keeps comment IDs and reply links, moderation flags, vote counts and 
 ```sh
 npm test
 npm run build
+npm run lint
 ```
 
 The tests use temporary SQLite databases and exercise threaded comments, edit ownership, duplicate votes and kudos, moderation, and origin handling.
+
+Run `npm run format` to format source files with Biome.

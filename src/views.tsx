@@ -22,7 +22,7 @@ export const renderer = jsxRenderer(({ children, title, area }) => (
     <body class={area === 'demo' ? 'demo-page' : undefined}>
       <header class="site-header">
         <div class="header-inner">
-          <a href="/" class="brand"><span aria-hidden="true">♥</span> Kucos</a>
+          <a href={area === 'demo' ? '/demo' : '/'} class="brand"><span aria-hidden="true">♥</span> Kucos</a>
           {area && area !== 'demo' ? (
             <>
               <nav aria-label="Moderation">
@@ -135,6 +135,48 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
       <pre class="snippet"><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
       <div id="kucos-comments"></div>
       <script src="/min/kucos.min.js" defer></script>
+
+      {/*<section class="demo-hero" aria-labelledby="demo-title">
+        <div class="demo-intro">
+          <h1 id="demo-title">Make room for discussion.</h1>
+          <p>Give readers a place to reply, write in Markdown, and leave kudos on your static site.</p>
+          <div class="demo-actions">
+            <a class="demo-button" href="#discussion">Try the widget <span aria-hidden="true">↓</span></a>
+            <a href="#embed">Get the embed code</a>
+          </div>
+        </div>
+
+        <section class="demo-preview" aria-labelledby="demo-example-title">
+          <header class="demo-preview-header">
+            <h2 id="demo-example-title">Example thread</h2>
+            <span class="demo-kudos"><span aria-hidden="true">♥</span> 12 kudos</span>
+          </header>
+          <div class="demo-thread">
+            <article>
+              <header class="demo-comment-meta"><strong>Anonymous</strong> <span>20 min ago</span></header>
+              <p>I tried the quiet route along the river. It’s worth the extra ten minutes.</p>
+              <p class="demo-comment-score">8 upvotes</p>
+              <article class="demo-reply">
+                <header class="demo-comment-meta"><strong>Article author</strong> <span>5 min ago</span></header>
+                <p>Good tip. I’ve added the <strong>riverside path</strong> to the guide.</p>
+              </article>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section id="discussion" class="demo-section" aria-labelledby="demo-discussion-title">
+        <h2 id="demo-discussion-title">Try it here</h2>
+        <p class="muted">Leave a comment or give this page kudos. No account needed.</p>
+        <div class="demo-widget"><div id="kucos-comments"></div></div>
+        <script src="/min/kucos.min.js" defer></script>
+      </section>
+
+      <section id="embed" class="demo-section" aria-labelledby="demo-embed-title">
+        <h2 id="demo-embed-title">Add Kucos to your site</h2>
+        <p class="muted">Add your site to <code>ALLOWED_ORIGINS</code>, then paste this where you want comments to appear.</p>
+        <pre class="snippet" tabindex={0}><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
+      </section>*/}
     </>
   )
 }
