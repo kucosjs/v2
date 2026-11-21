@@ -111,7 +111,7 @@ function applyQuery(rows, args = {}) {
 
 class GunStore {
   constructor({ peers, name = "app", gun, wait = 2000, id = () => randomUUID() } = {}) {
-    this.gun = gun ?? Gun({ peers: peers ?? [] });
+    this.gun = gun ?? Gun({ peers: peers ?? [], axe: false, multicast: false, stats: false });
     this.ns = this.gun.get("prisma-gun").get(name);
     this.wait = wait; this.id = id;
   }

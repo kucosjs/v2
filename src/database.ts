@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { gunRecordsStubAdapter, withGunRecords } from 'prisma-gun/records'
 import { PrismaClient } from './generated/prisma/client.js'
 import { databaseUrl } from './config.js'
+import { gunModels } from './gun-models.js'
 
 function gunPeer(value: string) {
   const peers = new Set(
@@ -37,5 +38,9 @@ export function openDatabase(url = databaseUrl) {
     return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) })
   }
   const peer = gunPeer(url)
-  return withGunRecords(new PrismaClient({ adapter: gunRecordsStubAdapter }), { peer })
+  return withGunRecords(new PrismaClient({ adapter: gunRecordsStubAdapter }), {
+    peer,
+    name: 'kucos',
+    models: gunModels,
+  })
 }
