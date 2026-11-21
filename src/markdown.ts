@@ -1,4 +1,4 @@
-import highlight from 'highlight.js/lib/common'
+import highlight from 'highlight.js'
 import { Marked } from 'marked'
 import { safeUrl } from './http.js'
 
