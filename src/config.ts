@@ -20,8 +20,8 @@ function origin(value: string) {
   return url.origin
 }
 
-export function readConfig() {
-  const publicUrl = origin(process.env.PUBLIC_URL || `http://localhost:${port}`)
+export function readConfig(defaults: { publicUrl?: string; proxyHops?: number } = {}) {
+  const publicUrl = origin(process.env.PUBLIC_URL || defaults.publicUrl || `http://localhost:${port}`)
   const allowedOrigins = new Set([
     publicUrl,
     ...(process.env.ALLOWED_ORIGINS ?? '')
@@ -37,7 +37,7 @@ export function readConfig() {
     adminPassword: process.env.ADMIN_PASSWORD || undefined,
     akismetKey: process.env.AKISMET_API_KEY || undefined,
     akismetTesting: process.env.AKISMET_TESTING === 'true',
-    proxyHops: readInteger(process.env.TRUST_PROXY_HOPS ?? '0', 'TRUST_PROXY_HOPS', 0, 100),
+    proxyHops: readInteger(process.env.TRUST_PROXY_HOPS ?? String(defaults.proxyHops ?? 0), 'TRUST_PROXY_HOPS', 0, 100),
   }
 }
 

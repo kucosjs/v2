@@ -3,6 +3,7 @@ legacy
 
 node_modules/
 dist/
+public/min/
 .env
 .env.*
 !.env.example
