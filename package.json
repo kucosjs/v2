@@ -14,6 +14,7 @@
     "build": "npm run build:widget && prisma generate && tsc",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
     "db:import": "node --import tsx scripts/import-legacy.ts",
     "test": "node --import tsx --test test/*.test.ts",
     "build:widget": "esbuild public/embed/kucos.js public/embed/kucos.css --minify --target=es2020 --outdir=dist/widget --out-extension:.js=.min.js --out-extension:.css=.min.css"
