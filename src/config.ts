@@ -24,7 +24,11 @@ export function readConfig() {
   const publicUrl = origin(process.env.PUBLIC_URL || `http://localhost:${port}`)
   const allowedOrigins = new Set([
     publicUrl,
-    ...(process.env.ALLOWED_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean).map(origin),
+    ...(process.env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map(origin),
   ])
 
   return {

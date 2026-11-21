@@ -37,14 +37,18 @@ const app = createApp({
       if (content.includes('Unavailable')) throw new Error('Akismet unavailable')
       return content.includes('Likely spam')
     },
-    feedback: async (_content, decision) => { feedback.push(decision) },
+    feedback: async (_content, decision) => {
+      feedback.push(decision)
+    },
   },
 })
 
 before(() => {
   const sqlite = new DatabaseSync(filename)
   const directories = readdirSync(migrations, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
   for (const directory of directories) {
     sqlite.exec(readFileSync(new URL(`${directory}/migration.sql`, migrations), 'utf8'))
   }
@@ -58,7 +62,12 @@ after(async () => {
 function write(path: string, body: object, user = visitor, method = 'POST', origin = site) {
   return app.request(path, {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-Kucos-Visitor': user, Origin: origin, 'X-Forwarded-For': '192.0.2.1' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Kucos-Visitor': user,
+      Origin: origin,
+      'X-Forwarded-For': '192.0.2.1',
+    },
     body: JSON.stringify(body),
   })
 }
@@ -77,14 +86,23 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   assert.equal(comment.email, undefined)
   const draftPath = `/api/comments/edit/${comment.id}`
   const ownerHeaders = { 'X-Kucos-Visitor': visitor }
-  assert.equal((await app.request(draftPath, { headers: { 'X-Kucos-Visitor': otherVisitor } })).status, 404)
+  assert.equal(
+    (await app.request(draftPath, { headers: { 'X-Kucos-Visitor': otherVisitor } })).status,
+    404,
+  )
   const draft = await app.request(draftPath, { headers: ownerHeaders })
   assert.equal(draft.status, 200)
   assert.equal((await draft.json()).message.email, 'author@example.test')
 
-  const replied = await write('/api/comments', {
-    article_url: article, comment: 'A reply', parent_id: comment.id,
-  }, otherVisitor)
+  const replied = await write(
+    '/api/comments',
+    {
+      article_url: article,
+      comment: 'A reply',
+      parent_id: comment.id,
+    },
+    otherVisitor,
+  )
   assert.equal(replied.status, 201)
   const { message: reply } = await replied.json()
   const path = `/api/comments/${encodeURIComponent(article)}`
@@ -93,20 +111,59 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   const thread = await response.json()
   assert.equal(thread.comments[comment.id].children[reply.id].id, reply.id)
   assert.equal(thread.count, 2)
-  assert.equal((await write('/api/comments', {
-    article_url: article, comment: 'Trying to edit', parent_id: comment.id,
-  }, otherVisitor, 'PATCH')).status, 403)
-  assert.equal((await write('/api/comments', {
-    article_url: article, comment: 'Updated text', parent_id: comment.id,
-  }, visitor, 'PATCH')).status, 200)
+  assert.equal(
+    (
+      await write(
+        '/api/comments',
+        {
+          article_url: article,
+          comment: 'Trying to edit',
+          parent_id: comment.id,
+        },
+        otherVisitor,
+        'PATCH',
+      )
+    ).status,
+    403,
+  )
+  assert.equal(
+    (
+      await write(
+        '/api/comments',
+        {
+          article_url: article,
+          comment: 'Updated text',
+          parent_id: comment.id,
+        },
+        visitor,
+        'PATCH',
+      )
+    ).status,
+    200,
+  )
   await database.comment.update({ where: { id: comment.id }, data: { createdAt: new Date(0) } })
   assert.equal((await app.request(draftPath, { headers: ownerHeaders })).status, 404)
-  assert.equal((await write('/api/comments', {
-    article_url: article, comment: 'Trying after expiry', parent_id: comment.id,
-  }, visitor, 'PATCH')).status, 403)
+  assert.equal(
+    (
+      await write(
+        '/api/comments',
+        {
+          article_url: article,
+          comment: 'Trying after expiry',
+          parent_id: comment.id,
+        },
+        visitor,
+        'PATCH',
+      )
+    ).status,
+    403,
+  )
 
   const vote = { msgid: comment.id, action: 'upvote' }
-  const responses = await Promise.all([write('/api/comments/vote', vote, otherVisitor), write('/api/comments/vote', vote, otherVisitor)])
+  const responses = await Promise.all([
+    write('/api/comments/vote', vote, otherVisitor),
+    write('/api/comments/vote', vote, otherVisitor),
+  ])
   assert.deepEqual(responses.map(({ status }) => status).sort(), [200, 400])
   assert.equal((await database.comment.findUniqueOrThrow({ where: { id: comment.id } })).likes, 1)
   const voterThread = await app.request(path, { headers: { 'X-Kucos-Visitor': otherVisitor } })
@@ -120,12 +177,16 @@ test('serves Gravatars for published comments without publishing email identifie
   const hash = createHash('sha256').update(email).digest('hex')
   const image = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
   let available = true
-  const fetchAvatar = context.mock.method(globalThis, 'fetch', async () => available
-    ? new Response(image, { headers: { 'Content-Type': 'image/gif' } })
-    : new Response(null, { status: 404 }))
+  const fetchAvatar = context.mock.method(globalThis, 'fetch', async () =>
+    available
+      ? new Response(image, { headers: { 'Content-Type': 'image/gif' } })
+      : new Response(null, { status: 404 }),
+  )
   const articleUrl = `${site}/avatar-test`
   const posted = await write('/api/comments', {
-    article_url: articleUrl, comment: 'A comment with an avatar', email: ` ${email.toUpperCase()} `,
+    article_url: articleUrl,
+    comment: 'A comment with an avatar',
+    email: ` ${email.toUpperCase()} `,
   })
   assert.equal(posted.status, 201)
   const { message: comment } = await posted.json()
@@ -142,17 +203,32 @@ test('serves Gravatars for published comments without publishing email identifie
   assert.equal(avatar.headers.get('Content-Type'), 'image/gif')
   assert.equal(avatar.headers.get('Cross-Origin-Resource-Policy'), 'cross-origin')
   assert.deepEqual(Buffer.from(await avatar.arrayBuffer()), image)
-  assert.equal(fetchAvatar.mock.calls[0].arguments[0], `https://0.gravatar.com/avatar/${hash}?s=80&d=404&r=g`)
+  assert.equal(
+    fetchAvatar.mock.calls[0].arguments[0],
+    `https://0.gravatar.com/avatar/${hash}?s=80&d=404&r=g`,
+  )
 
   available = false
   assert.equal((await app.request(comment.avatarUrl)).status, 404)
-  const edited = await write('/api/comments', {
-    article_url: articleUrl, comment: 'An edited avatar comment', parent_id: comment.id, email: 'another@example.test',
-  }, visitor, 'PATCH')
+  const edited = await write(
+    '/api/comments',
+    {
+      article_url: articleUrl,
+      comment: 'An edited avatar comment',
+      parent_id: comment.id,
+      email: 'another@example.test',
+    },
+    visitor,
+    'PATCH',
+  )
   assert.equal(edited.status, 200)
   assert.notEqual((await edited.json()).message.avatarUrl, comment.avatarUrl)
 
-  const flagged = await write('/api/comments', { article_url: articleUrl, comment: 'Likely spam', email })
+  const flagged = await write('/api/comments', {
+    article_url: articleUrl,
+    comment: 'Likely spam',
+    email,
+  })
   const { message: hidden } = await flagged.json()
   assert.equal(hidden.avatarUrl, null)
   assert.equal((await app.request(`/api/comments/avatar/${hidden.id}`)).status, 404)
@@ -160,7 +236,9 @@ test('serves Gravatars for published comments without publishing email identifie
 })
 
 test('Marked preserves legacy spoilers, inline quotes and links', () => {
-  const html = renderMarkdown('!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).')
+  const html = renderMarkdown(
+    '!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).',
+  )
   assert.match(html, /<details[^>]*>.*<strong>hidden<\/strong>/s)
   assert.match(html, /<br>\s*next line/)
   assert.match(html, /<q>quote<\/q>/)
@@ -187,10 +265,17 @@ test('counting and removing kudos is idempotent per visitor', async () => {
 test('an article URL change keeps its comments and kudos together', async () => {
   const original = `${site}/original`
   const moved = `${site}/moved`
-  const posted = await write('/api/comments', { article_url: original, comment: 'An existing comment' })
+  const posted = await write('/api/comments', {
+    article_url: original,
+    comment: 'An existing comment',
+  })
   assert.equal(posted.status, 201)
   const { message: comment } = await posted.json()
-  const reply = await write('/api/comments', { article_url: original, comment: 'An existing reply', parent_id: comment.id })
+  const reply = await write('/api/comments', {
+    article_url: original,
+    comment: 'An existing reply',
+    parent_id: comment.id,
+  })
   assert.equal(reply.status, 201)
   const { message: child } = await reply.json()
   const vote = { msgid: comment.id, action: 'upvote' }
@@ -225,12 +310,17 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
   const pendingSource = `/api/comments/row/${pendingComment.id}`
   const headers = { 'X-Kucos-Visitor': visitor }
   assert.equal((await app.request(pendingSource, { headers })).status, 200)
-  await database.comment.update({ where: { id: pendingComment.id }, data: { createdAt: new Date(0) } })
+  await database.comment.update({
+    where: { id: pendingComment.id },
+    data: { createdAt: new Date(0) },
+  })
   assert.equal((await app.request(pendingSource, { headers })).status, 404)
   assert.equal((await app.request('/overview')).status, 302)
   assert.equal((await app.request('/')).headers.get('Referrer-Policy'), 'same-origin')
   const login = await app.request('/login', {
-    method: 'POST', headers: { Origin: 'http://localhost:3000' }, body: new URLSearchParams({ password: 'test-password' }),
+    method: 'POST',
+    headers: { Origin: 'http://localhost:3000' },
+    body: new URLSearchParams({ password: 'test-password' }),
   })
   assert.equal(login.status, 303)
   const setCookie = login.headers.get('Set-Cookie')
@@ -242,10 +332,19 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
   const dashboard = await app.request('/spam', { headers: { cookie } })
   assert.equal(dashboard.status, 200)
   assert.match(await dashboard.text(), /Likely spam/)
-  assert.equal((await app.request(`/notspam/${comment.id}`, {
-    method: 'PATCH', headers: { cookie, origin: 'https://other.example' },
-  })).status, 403)
-  assert.equal((await app.request(`/notspam/${comment.id}`, { method: 'PATCH', headers: { cookie } })).status, 200)
+  assert.equal(
+    (
+      await app.request(`/notspam/${comment.id}`, {
+        method: 'PATCH',
+        headers: { cookie, origin: 'https://other.example' },
+      })
+    ).status,
+    403,
+  )
+  assert.equal(
+    (await app.request(`/notspam/${comment.id}`, { method: 'PATCH', headers: { cookie } })).status,
+    200,
+  )
   assert.deepEqual(feedback, ['submit-ham'])
   assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 200)
   assert.equal((await app.request('/logout', { method: 'POST', headers: { cookie } })).status, 303)
@@ -256,7 +355,8 @@ test('admin sessions expire after eight hours and are scoped to the running app'
   context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
   const running = createApp({ database, config })
   const login = await running.request('/login', {
-    method: 'POST', body: new URLSearchParams({ password: config.adminPassword }),
+    method: 'POST',
+    body: new URLSearchParams({ password: config.adminPassword }),
   })
   assert.equal(login.status, 303)
   const setCookie = login.headers.get('Set-Cookie')
@@ -276,10 +376,17 @@ test('admin sessions expire after eight hours and are scoped to the running app'
 
 test('only registered origins may preflight and post to their own articles', async () => {
   const preflight = await app.request('/api/comments', {
-    method: 'OPTIONS', headers: { Origin: site, 'Access-Control-Request-Method': 'POST' },
+    method: 'OPTIONS',
+    headers: { Origin: site, 'Access-Control-Request-Method': 'POST' },
   })
   assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), site)
-  const other = await write('/api/comments', { article_url: article, comment: 'Rejected' }, visitor, 'POST', 'https://other.example')
+  const other = await write(
+    '/api/comments',
+    { article_url: article, comment: 'Rejected' },
+    visitor,
+    'POST',
+    'https://other.example',
+  )
   assert.equal(other.status, 403)
   assert.equal(other.headers.get('Access-Control-Allow-Origin'), null)
 })
@@ -287,10 +394,17 @@ test('only registered origins may preflight and post to their own articles', asy
 test('the public API limits reads and writes separately for each client IP', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
   const limited = createApp({ database, config })
-  const headers = { 'Content-Type': 'application/json', 'X-Forwarded-For': '192.0.2.10', Origin: site }
-  const write = (requestHeaders = headers) => limited.request('/api/comments', {
-    method: 'POST', headers: requestHeaders, body: '{}',
-  })
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Forwarded-For': '192.0.2.10',
+    Origin: site,
+  }
+  const write = (requestHeaders = headers) =>
+    limited.request('/api/comments', {
+      method: 'POST',
+      headers: requestHeaders,
+      body: '{}',
+    })
 
   for (let index = 0; index < 90; index++) assert.equal((await write()).status, 400)
   const denied = await write()
@@ -298,7 +412,10 @@ test('the public API limits reads and writes separately for each client IP', asy
   assert.match(denied.headers.get('Retry-After') ?? '', /^(?:[1-9]|[1-5][0-9]|60)$/)
   assert.equal(denied.headers.get('Access-Control-Allow-Origin'), site)
   assert.match(denied.headers.get('Access-Control-Expose-Headers') ?? '', /Retry-After/i)
-  assert.equal((await limited.request('/api/kudos', { method: 'POST', headers, body: '{}' })).status, 429)
+  assert.equal(
+    (await limited.request('/api/kudos', { method: 'POST', headers, body: '{}' })).status,
+    429,
+  )
   assert.equal((await write({ ...headers, 'X-Forwarded-For': '192.0.2.11' })).status, 400)
 
   for (let index = 0; index < 360; index++) {
@@ -306,7 +423,8 @@ test('the public API limits reads and writes separately for each client IP', asy
   }
   assert.equal((await limited.request('/api/comments/invalid-url', { headers })).status, 429)
   const preflight = await limited.request('/api/comments', {
-    method: 'OPTIONS', headers: { ...headers, 'Access-Control-Request-Method': 'POST' },
+    method: 'OPTIONS',
+    headers: { ...headers, 'Access-Control-Request-Method': 'POST' },
   })
   assert.equal(preflight.status, 204)
 
@@ -316,9 +434,16 @@ test('the public API limits reads and writes separately for each client IP', asy
 
 test('public API limits use the socket IP when no proxy is trusted', async () => {
   const limited = createApp({ database, config: { ...config, proxyHops: 0 } })
-  const write = (remoteAddress: string, forwardedFor: string) => limited.request('/api/kudos', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': forwardedFor }, body: '{}',
-  }, { incoming: { socket: { remoteAddress } } })
+  const write = (remoteAddress: string, forwardedFor: string) =>
+    limited.request(
+      '/api/kudos',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': forwardedFor },
+        body: '{}',
+      },
+      { incoming: { socket: { remoteAddress } } },
+    )
 
   for (let index = 0; index < 90; index++) {
     assert.equal((await write('192.0.2.12', '192.0.2.13')).status, 400)
@@ -330,10 +455,22 @@ test('public API limits use the socket IP when no proxy is trusted', async () =>
 test('keeps very deep threads serializable without losing replies', () => {
   const now = new Date()
   const sample: Comment = {
-    id: '', articleId: '', author: 'Anonymous', content: 'A reply',
-    email: null, website: null, owner: visitor, parentId: null,
-    moderation: 'published', pinned: false, likes: 0, dislikes: 0,
-    createdAt: now, updatedAt: now, ip: null, userAgent: null,
+    id: '',
+    articleId: '',
+    author: 'Anonymous',
+    content: 'A reply',
+    email: null,
+    website: null,
+    owner: visitor,
+    parentId: null,
+    moderation: 'published',
+    pinned: false,
+    likes: 0,
+    dislikes: 0,
+    createdAt: now,
+    updatedAt: now,
+    ip: null,
+    userAgent: null,
   }
   const comments = Array.from({ length: 5000 }, (_, index) => ({
     ...sample,

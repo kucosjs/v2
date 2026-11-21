@@ -27,7 +27,9 @@ export function articleUrl(value: string) {
 
 export function clientIp(c: Context, proxyHops: number) {
   if (proxyHops) {
-    const addresses = (c.req.header('X-Forwarded-For') ?? '').split(',').map((address) => address.trim())
+    const addresses = (c.req.header('X-Forwarded-For') ?? '')
+      .split(',')
+      .map((address) => address.trim())
     const address = addresses.at(-proxyHops)
     if (address && isIP(address)) return address
   }
@@ -52,7 +54,11 @@ export function writeVisitor(c: Context, config: Config) {
   const token = randomUUID()
   const secure = config.publicUrl.startsWith('https:')
   setCookie(c, 'kucos', token, {
-    httpOnly: true, secure, sameSite: secure ? 'None' : 'Lax', path: '/', maxAge: 60 * 60 * 24 * 365,
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'None' : 'Lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
   })
   return digest(token)
 }

@@ -9,13 +9,19 @@ export const EDIT_WINDOW = 60 * 60 * 1000
 const MAX_THREAD_DEPTH = 32
 
 const timestamp = new Intl.DateTimeFormat('en', {
-  dateStyle: 'full', timeStyle: 'medium', timeZone: 'UTC',
+  dateStyle: 'full',
+  timeStyle: 'medium',
+  timeZone: 'UTC',
 })
 
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const units = [
-  ['year', 31536000], ['month', 2592000], ['day', 86400],
-  ['hour', 3600], ['minute', 60], ['second', 1],
+  ['year', 31536000],
+  ['month', 2592000],
+  ['day', 86400],
+  ['hour', 3600],
+  ['minute', 60],
+  ['second', 1],
 ] as const
 
 function relativeTime(date: Date) {
@@ -37,10 +43,11 @@ export function publicComment(comment: CommentWithViewerVote, owner?: string) {
     author: hidden ? 'Hidden' : String(html`${comment.author}`),
     authorText: hidden ? 'Hidden' : comment.author,
     comment: hidden ? 'Hidden' : renderMarkdown(comment.content),
-    website: hidden || !comment.website ? null : safeUrl(comment.website)?.href ?? null,
-    avatarUrl: !hidden && comment.email?.trim()
-      ? `/api/comments/avatar/${encodeURIComponent(comment.id)}?v=${comment.updatedAt.getTime()}`
-      : null,
+    website: hidden || !comment.website ? null : (safeUrl(comment.website)?.href ?? null),
+    avatarUrl:
+      !hidden && comment.email?.trim()
+        ? `/api/comments/avatar/${encodeURIComponent(comment.id)}?v=${comment.updatedAt.getTime()}`
+        : null,
     parent_id: comment.parentId,
     createdOn: comment.createdAt,
     createdOnTime: timestamp.format(comment.createdAt),

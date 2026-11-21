@@ -42,7 +42,10 @@ export function createAkismet(config: Config): Akismet {
     if (!key || !input.ip) throw new Error('Akismet requires a key and the original submitter IP.')
     return {
       client: new AkismetClient({
-        key, blog: new URL(input.article).origin, charset: 'UTF-8', userAgent: 'Kucos/2.0',
+        key,
+        blog: new URL(input.article).origin,
+        charset: 'UTF-8',
+        userAgent: 'Kucos/2.0',
       }),
       comment: {
         ip: input.ip,
@@ -69,7 +72,9 @@ export function createAkismet(config: Config): Akismet {
     async feedback(input, decision) {
       if (!key) return
       const { client, comment } = request(input)
-      await deadline(decision === 'submit-spam' ? client.submitSpam(comment) : client.submitHam(comment))
+      await deadline(
+        decision === 'submit-spam' ? client.submitSpam(comment) : client.submitHam(comment),
+      )
     },
   }
 }

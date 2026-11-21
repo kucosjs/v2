@@ -4,7 +4,7 @@ import { PrismaClient } from './generated/prisma/client.js'
 import { databaseUrl } from './config.js'
 
 export function openDatabase(url = databaseUrl) {
-  if (url.startsWith("file:")) {
+  if (url.startsWith('file:')) {
     return new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })
   }
 

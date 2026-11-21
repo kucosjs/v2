@@ -20,7 +20,11 @@ const assets = [
   { route: '/admin/style.css', source: 'admin/style.css' },
 ]
 
-export function createApp({ database, config, akismet = createAkismet(config) }: {
+export function createApp({
+  database,
+  config,
+  akismet = createAkismet(config),
+}: {
   database: PrismaClient
   config: Config
   akismet?: Akismet
@@ -33,15 +37,20 @@ export function createApp({ database, config, akismet = createAkismet(config) }:
   app.notFound((c) => c.json({ status: 'error', message: 'Page not found.' }, 404))
 
   for (const { route, source, built } of assets) {
-    const asset = built && existsSync(join(widgetRoot, built))
-      ? { root: widgetRoot, path: built }
-      : { root: publicRoot, path: source }
-    app.get(route, async (c, next) => {
-      c.header('X-Content-Type-Options', 'nosniff')
-      c.header('Cross-Origin-Resource-Policy', 'cross-origin')
-      c.header('Cache-Control', asset.root === widgetRoot ? 'public, max-age=300' : 'no-cache')
-      await next()
-    }, serveStatic(asset))
+    const asset =
+      built && existsSync(join(widgetRoot, built))
+        ? { root: widgetRoot, path: built }
+        : { root: publicRoot, path: source }
+    app.get(
+      route,
+      async (c, next) => {
+        c.header('X-Content-Type-Options', 'nosniff')
+        c.header('Cross-Origin-Resource-Policy', 'cross-origin')
+        c.header('Cache-Control', asset.root === widgetRoot ? 'public, max-age=300' : 'no-cache')
+        await next()
+      },
+      serveStatic(asset),
+    )
   }
 
   app.route('/api', createApi({ database, config, akismet }))

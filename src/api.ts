@@ -7,7 +7,17 @@ import type { Akismet, SpamInput } from './akismet.js'
 import { canEdit, commentThreads, EDIT_WINDOW, publicComment } from './comments.js'
 import type { Config } from './config.js'
 import type { PrismaClient, Moderation } from './generated/prisma/client.js'
-import { articleUrl, clientIp, digest, failure, requestBody, safeUrl, success, visitor, writeVisitor } from './http.js'
+import {
+  articleUrl,
+  clientIp,
+  digest,
+  failure,
+  requestBody,
+  safeUrl,
+  success,
+  visitor,
+  writeVisitor,
+} from './http.js'
 import { publicRateLimit } from './rate-limit.js'
 
 type Services = { database: PrismaClient; config: Config; akismet: Akismet }
@@ -19,7 +29,10 @@ const commentInput = z.object({
   comment: z.string().trim().min(4).max(4999),
   author: optionalText,
   email: optionalText,
-  website: optionalText.refine((value) => !value || !!safeUrl(value), 'Use an HTTP(S) website URL.'),
+  website: optionalText.refine(
+    (value) => !value || !!safeUrl(value),
+    'Use an HTTP(S) website URL.',
+  ),
   parent_id: id.or(z.literal('')).optional(),
 })
 const voteInput = z.object({ msgid: id, action: z.enum(['upvote', 'downvote']) })
@@ -36,24 +49,29 @@ export function createApi({ database, config, akismet }: Services) {
     c.header('X-Content-Type-Options', 'nosniff')
     await next()
   })
-  api.use('*', cors({
-    origin: (origin) => config.allowedOrigins.has(origin) ? origin : undefined,
-    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'X-Kucos-Visitor'],
-    exposeHeaders: ['Retry-After'],
-    credentials: true,
-  }))
+  api.use(
+    '*',
+    cors({
+      origin: (origin) => (config.allowedOrigins.has(origin) ? origin : undefined),
+      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'X-Kucos-Visitor'],
+      exposeHeaders: ['Retry-After'],
+      credentials: true,
+    }),
+  )
   api.use('*', publicRateLimit(config.proxyHops), bodyLimit({ maxSize: 64 * 1024 }))
 
   function allowsWrite(c: Context, article: URL) {
     const origin = c.req.header('Origin')
-    return config.allowedOrigins.has(article.origin) &&
+    return (
+      config.allowedOrigins.has(article.origin) &&
       (!origin || origin === article.origin || origin === config.publicUrl)
+    )
   }
 
   async function verdict(input: SpamInput): Promise<Moderation> {
     try {
-      return await akismet.check(input) ? 'spam' : 'published'
+      return (await akismet.check(input)) ? 'spam' : 'published'
     } catch {
       console.warn('Akismet check failed. The comment is pending moderation.')
       return 'pending'
@@ -66,18 +84,25 @@ export function createApi({ database, config, akismet }: Services) {
       return success(c, 'Comment added.', 201)
     }
     const result = commentInput.safeParse(body)
-    if (!result.success) return failure(c, 'Enter a comment between 4 and 4999 characters and check the optional fields.')
+    if (!result.success)
+      return failure(
+        c,
+        'Enter a comment between 4 and 4999 characters and check the optional fields.',
+      )
 
     const input = result.data
     const article = articleUrl(input.article_url)
     if (!article) return failure(c, 'Invalid article URL.')
-    if (!allowsWrite(c, article)) return failure(c, 'This article cannot accept comments from this origin.', 403)
+    if (!allowsWrite(c, article))
+      return failure(c, 'This article cannot accept comments from this origin.', 403)
 
     const editing = c.req.method === 'PATCH'
     const owner = writeVisitor(c, config)
-    const linked = input.parent_id && await database.comment.findFirst({
-      where: { id: input.parent_id, article: { url: article.href } },
-    })
+    const linked =
+      input.parent_id &&
+      (await database.comment.findFirst({
+        where: { id: input.parent_id, article: { url: article.href } },
+      }))
     if ((editing || input.parent_id) && !linked) return failure(c, 'Comment not found.', 404)
 
     const cutoff = new Date(Date.now() - EDIT_WINDOW)
@@ -91,12 +116,15 @@ export function createApi({ database, config, akismet }: Services) {
     const previous = editing && linked ? linked : undefined
     const now = new Date()
     const data = {
-      author: input.author === undefined ? previous?.author ?? 'Anonymous' : input.author || 'Anonymous',
+      author:
+        input.author === undefined
+          ? (previous?.author ?? 'Anonymous')
+          : input.author || 'Anonymous',
       content: input.comment,
-      email: input.email === undefined ? previous?.email ?? null : input.email || null,
-      website: input.website === undefined ? previous?.website ?? null : input.website || null,
-      ip: akismet.enabled ? clientIp(c, config.proxyHops) ?? previous?.ip ?? null : null,
-      userAgent: akismet.enabled ? c.req.header('User-Agent')?.slice(0, 1024) ?? null : null,
+      email: input.email === undefined ? (previous?.email ?? null) : input.email || null,
+      website: input.website === undefined ? (previous?.website ?? null) : input.website || null,
+      ip: akismet.enabled ? (clientIp(c, config.proxyHops) ?? previous?.ip ?? null) : null,
+      userAgent: akismet.enabled ? (c.req.header('User-Agent')?.slice(0, 1024) ?? null) : null,
       createdAt: previous?.createdAt ?? now,
     }
     const checked = await verdict({ ...data, article: article.href })
@@ -105,15 +133,21 @@ export function createApi({ database, config, akismet }: Services) {
     if (previous) {
       const updated = await database.comment.updateManyAndReturn({
         where: {
-          id: previous.id, owner, updatedAt: previous.updatedAt, moderation: previous.moderation,
+          id: previous.id,
+          owner,
+          updatedAt: previous.updatedAt,
+          moderation: previous.moderation,
           article: { url: article.href },
           createdAt: { gte: new Date(Date.now() - EDIT_WINDOW) },
         },
         data: {
-          ...data, moderation, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)),
+          ...data,
+          moderation,
+          updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)),
         },
       })
-      if (!updated.length) return failure(c, 'This comment changed or can no longer be edited.', 409)
+      if (!updated.length)
+        return failure(c, 'This comment changed or can no longer be edited.', 409)
       return success(c, publicComment(updated[0], owner))
     }
 
@@ -121,11 +155,26 @@ export function createApi({ database, config, akismet }: Services) {
       const record = await database.$transaction(async (tx) => {
         const url = article.href
         const storedArticle = linked
-          ? await tx.article.findUnique({ where: { id: linked.articleId, url }, select: { id: true } })
-          : await tx.article.upsert({ where: { url }, create: { url }, update: {}, select: { id: true } })
+          ? await tx.article.findUnique({
+              where: { id: linked.articleId, url },
+              select: { id: true },
+            })
+          : await tx.article.upsert({
+              where: { url },
+              create: { url },
+              update: {},
+              select: { id: true },
+            })
         if (!storedArticle) return null
         return tx.comment.create({
-          data: { ...data, articleId: storedArticle.id, owner, parentId: linked ? linked.id : null, moderation, updatedAt: now },
+          data: {
+            ...data,
+            articleId: storedArticle.id,
+            owner,
+            parentId: linked ? linked.id : null,
+            moderation,
+            updatedAt: now,
+          },
         })
       })
       if (!record) return failure(c, 'Parent comment not found.', 404)
@@ -146,8 +195,14 @@ export function createApi({ database, config, akismet }: Services) {
 
   api.get('/comments/edit/:id', async (c) => {
     const entry = await database.comment.findUnique({ where: { id: c.req.param('id') } })
-    if (!entry || !canEdit(entry, visitor(c))) return failure(c, 'Comment not found or no longer editable.', 404)
-    return success(c, { comment: entry.content, author: entry.author, email: entry.email, website: entry.website })
+    if (!entry || !canEdit(entry, visitor(c)))
+      return failure(c, 'Comment not found or no longer editable.', 404)
+    return success(c, {
+      comment: entry.content,
+      author: entry.author,
+      email: entry.email,
+      website: entry.website,
+    })
   })
 
   api.get('/comments/avatar/:id', async (c) => {
@@ -161,7 +216,9 @@ export function createApi({ database, config, akismet }: Services) {
     if (!email) return c.body(null, 404)
 
     const url = `https://0.gravatar.com/avatar/${digest(email)}?s=80&d=404&r=g`
-    const avatar = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(4000) }).catch(() => null)
+    const avatar = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(4000) }).catch(
+      () => null,
+    )
     const contentType = avatar?.headers.get('Content-Type')?.split(';')[0] ?? ''
     if (!avatar?.ok || !avatar.body || !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(contentType)) {
       await avatar?.body?.cancel().catch(() => {})
@@ -213,7 +270,8 @@ export function createApi({ database, config, akismet }: Services) {
       return success(c, { ...updated, score: updated.likes - updated.dislikes })
     } catch (error) {
       if (knownError(error, 'P2002')) return failure(c, 'You already voted on this comment.')
-      if (knownError(error, 'P2003') || knownError(error, 'P2025')) return failure(c, 'Comment not found.', 404)
+      if (knownError(error, 'P2003') || knownError(error, 'P2025'))
+        return failure(c, 'Comment not found.', 404)
       throw error
     }
   })
@@ -223,7 +281,10 @@ export function createApi({ database, config, akismet }: Services) {
     if (!article) return failure(c, 'Invalid article URL.')
     const kudos = await database.kudos.findFirst({
       where: { article: { url: article.href } },
-      select: { count: true, _count: { select: { members: { where: { visitor: visitor(c) ?? '' } } } } },
+      select: {
+        count: true,
+        _count: { select: { members: { where: { visitor: visitor(c) ?? '' } } } },
+      },
     })
     return success(c, { kudos: kudos?.count ?? 0, given: Boolean(kudos?._count.members) })
   })
@@ -233,29 +294,41 @@ export function createApi({ database, config, akismet }: Services) {
     if (!result.success) return failure(c, 'Provide an article URL and kudos action.')
     const requestedArticle = articleUrl(result.data.id)
     if (!requestedArticle) return failure(c, 'Invalid article URL.')
-    if (!allowsWrite(c, requestedArticle)) return failure(c, 'Kudos are not allowed from this origin.', 403)
+    if (!allowsWrite(c, requestedArticle))
+      return failure(c, 'Kudos are not allowed from this origin.', 403)
 
     const url = requestedArticle.href
     const owner = writeVisitor(c, config)
     const given = result.data.kudo === 'add'
     const count = await database.$transaction(async (tx) => {
       const article = given
-        ? await tx.article.upsert({ where: { url }, create: { url }, update: {}, select: { id: true } })
+        ? await tx.article.upsert({
+            where: { url },
+            create: { url },
+            update: {},
+            select: { id: true },
+          })
         : await tx.article.findUnique({ where: { url }, select: { id: true } })
       if (!article) return 0
       const articleId = article.id
 
       if (given) {
-        const kudos = await tx.kudos.upsert({ where: { articleId }, update: {}, create: { articleId } })
+        const kudos = await tx.kudos.upsert({
+          where: { articleId },
+          update: {},
+          create: { articleId },
+        })
         const where = { articleId_visitor: { articleId, visitor: owner } }
         if (await tx.kudosMember.findUnique({ where })) return kudos.count
         await tx.kudosMember.create({ data: { articleId, visitor: owner } })
-        return (await tx.kudos.update({ where: { articleId }, data: { count: { increment: 1 } } })).count
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { increment: 1 } } }))
+          .count
       }
 
       const removed = await tx.kudosMember.deleteMany({ where: { articleId, visitor: owner } })
       if (removed.count) {
-        return (await tx.kudos.update({ where: { articleId }, data: { count: { decrement: 1 } } })).count
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { decrement: 1 } } }))
+          .count
       }
       return (await tx.kudos.findUnique({ where: { articleId } }))?.count ?? 0
     })

@@ -32,19 +32,36 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   const admin = new Hono()
   const attempts = new Map<string, { count: number; until: number }>()
   const sessions = new Map<string, number>()
-  const cookieOptions = { path: '/', httpOnly: true, sameSite: 'Strict' as const, secure: config.publicUrl.startsWith('https:') }
+  const cookieOptions = {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Strict' as const,
+    secure: config.publicUrl.startsWith('https:'),
+  }
   const sessionId = (token: string) => digest(`${config.adminPassword}\n${token}`)
 
-  admin.use('*', secureHeaders({
-    referrerPolicy: 'same-origin',
-    contentSecurityPolicy: { defaultSrc: ["'self'"], frameAncestors: ["'none'"], formAction: ["'self'"], baseUri: ["'none'"] },
-  }))
+  admin.use(
+    '*',
+    secureHeaders({
+      referrerPolicy: 'same-origin',
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+        baseUri: ["'none'"],
+      },
+    }),
+  )
   admin.use('*', async (c, next) => {
     c.header('Cache-Control', 'no-store')
     const origin = c.req.header('Origin')
     const fetchSite = c.req.header('Sec-Fetch-Site')
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
-        (origin ? origin !== config.publicUrl : fetchSite && !['same-origin', 'none'].includes(fetchSite))) {
+    if (
+      !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
+      (origin
+        ? origin !== config.publicUrl
+        : fetchSite && !['same-origin', 'none'].includes(fetchSite))
+    ) {
       return failure(c, 'Invalid request origin.', 403)
     }
     await next()
@@ -71,7 +88,9 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     if (session(c)) return c.redirect('/overview')
     return c.render(<SignIn configured={!!config.adminPassword} />, { title: 'Sign in' })
   })
-  admin.get('/demo', (c) => c.render(<Demo publicUrl={config.publicUrl} />, { title: 'Widget demo', area: 'demo' }))
+  admin.get('/demo', (c) =>
+    c.render(<Demo publicUrl={config.publicUrl} />, { title: 'Widget demo', area: 'demo' }),
+  )
 
   admin.post('/login', async (c) => {
     const body = z.object({ password: z.string().max(4096) }).safeParse(await requestBody(c))
@@ -79,7 +98,9 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     const reject = (message: string, status: 400 | 403 | 429) => {
       if (wantsJson) return failure(c, message, status)
       c.status(status)
-      return c.render(<SignIn error={message} configured={!!config.adminPassword} />, { title: 'Sign in' })
+      return c.render(<SignIn error={message} configured={!!config.adminPassword} />, {
+        title: 'Sign in',
+      })
     }
     if (!config.adminPassword) return reject('Moderation is disabled.', 403)
 
@@ -93,8 +114,17 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
       c.header('Retry-After', String(Math.ceil(((attempt?.until ?? now + 60000) - now) / 1000)))
       return reject('Too many sign-in attempts. Try again later.', 429)
     }
-    if (!body.success || !timingSafeEqual(Buffer.from(digest(body.data.password)), Buffer.from(digest(config.adminPassword)))) {
-      attempts.set(key, { count: (attempt?.count ?? 0) + 1, until: attempt?.until ?? now + 15 * 60 * 1000 })
+    if (
+      !body.success ||
+      !timingSafeEqual(
+        Buffer.from(digest(body.data.password)),
+        Buffer.from(digest(config.adminPassword)),
+      )
+    ) {
+      attempts.set(key, {
+        count: (attempt?.count ?? 0) + 1,
+        until: attempt?.until ?? now + 15 * 60 * 1000,
+      })
       return reject('Invalid password.', 400)
     }
 
@@ -121,19 +151,31 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   })
 
   admin.get('/overview', protect, async (c) => {
-    const countByArticle = database.comment.groupBy({ by: ['articleId', 'moderation'], _count: true })
+    const countByArticle = database.comment.groupBy({
+      by: ['articleId', 'moderation'],
+      _count: true,
+    })
     const [records, groups] = await database.$transaction([
-      database.article.findMany({ where: { comments: { some: {} } }, orderBy: { url: 'asc' }, select: { id: true, url: true } }),
+      database.article.findMany({
+        where: { comments: { some: {} } },
+        orderBy: { url: 'asc' },
+        select: { id: true, url: true },
+      }),
       countByArticle,
     ])
-    const articles = new Map(records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]))
+    const articles = new Map(
+      records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]),
+    )
     for (const group of groups) {
       const stats = articles.get(group.articleId)
       if (!stats) continue
       stats.total += group._count
       if (group.moderation !== 'published') stats.review += group._count
     }
-    return c.render(<Overview articles={[...articles.values()]} />, { title: 'Articles', area: 'overview' })
+    return c.render(<Overview articles={[...articles.values()]} />, {
+      title: 'Articles',
+      area: 'overview',
+    })
   })
 
   admin.get('/comments', protect, (c) => list(c, false))
@@ -147,13 +189,25 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
       where: review ? { moderation: { not: 'published' } } : { article: { url: article } },
       include: { article: { select: { url: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      skip: (page - 1) * pageSize, take: pageSize + 1,
+      skip: (page - 1) * pageSize,
+      take: pageSize + 1,
     })
     const updated = c.req.query('updated')
-    const notice = updated && Object.hasOwn(notices, updated) ? notices[updated as keyof typeof notices] : undefined
-    return c.render(<CommentList comments={comments.slice(0, pageSize)} article={article} review={review}
-      page={page} hasNext={comments.length > pageSize} notice={notice} />,
-    { title: review ? 'Review queue' : 'Article comments', area: review ? 'spam' : 'comments' })
+    const notice =
+      updated && Object.hasOwn(notices, updated)
+        ? notices[updated as keyof typeof notices]
+        : undefined
+    return c.render(
+      <CommentList
+        comments={comments.slice(0, pageSize)}
+        article={article}
+        review={review}
+        page={page}
+        hasNext={comments.length > pageSize}
+        notice={notice}
+      />,
+      { title: review ? 'Review queue' : 'Article comments', area: review ? 'spam' : 'comments' },
+    )
   }
   admin.get('/spam', protect, (c) => list(c, true))
 
@@ -163,7 +217,8 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     let sendFeedback: 'submit-ham' | 'submit-spam' | undefined
     await database.$transaction(async (tx) => {
       const comment = await tx.comment.findUnique({
-        where: { id }, include: { article: { select: { url: true } } },
+        where: { id },
+        include: { article: { select: { url: true } } },
       })
       if (!comment) return
       changed = comment
@@ -194,9 +249,13 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   }
 
   admin.post('/moderate/:id', protect, async (c) => {
-    const input = z.object({
-      action: z.enum(['approve', 'spam', 'pin', 'delete']), view: z.enum(['spam', 'comments']), page: z.string().optional(),
-    }).safeParse(await requestBody(c))
+    const input = z
+      .object({
+        action: z.enum(['approve', 'spam', 'pin', 'delete']),
+        view: z.enum(['spam', 'comments']),
+        page: z.string().optional(),
+      })
+      .safeParse(await requestBody(c))
     if (!input.success) return failure(c, 'Invalid moderation action.')
     const { action, view, page } = input.data
     const { comment, feedbackFailed } = await moderate(c.req.param('id'), action)

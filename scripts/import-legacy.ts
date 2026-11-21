@@ -19,13 +19,24 @@ async function rows(directory: string, collection: string): Promise<Row[]> {
   try {
     source = (await readFile(join(directory, `${collection}.json`), 'utf8')).trim()
   } catch (error) {
-    if (collection !== 'comments' && error instanceof Error && 'code' in error && error.code === 'ENOENT') return []
+    if (
+      collection !== 'comments' &&
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    )
+      return []
     throw new Error(`Could not read ${collection}.json.`)
   }
 
   try {
     if (!source) return []
-    const data: unknown[] = source.startsWith('[') ? JSON.parse(source) : source.split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line))
+    const data: unknown[] = source.startsWith('[')
+      ? JSON.parse(source)
+      : source
+          .split(/\r?\n/)
+          .filter((line) => line.trim())
+          .map((line) => JSON.parse(line))
     return data.map(record)
   } catch {
     throw new Error(`Invalid MongoDB JSON in ${collection}.json.`)
@@ -43,7 +54,9 @@ function objectId(value: unknown): string {
 
 function integer(value: unknown): number {
   const data = value && typeof value === 'object' ? record(value) : null
-  const number = Number(data ? data.$numberInt ?? data.$numberLong ?? data.$numberDouble : value ?? 0)
+  const number = Number(
+    data ? (data.$numberInt ?? data.$numberLong ?? data.$numberDouble) : (value ?? 0),
+  )
   if (!Number.isInteger(number) || number > 2147483647 || number < -2147483648) {
     throw new Error('A MongoDB counter is outside the supported range.')
   }
@@ -53,7 +66,9 @@ function integer(value: unknown): number {
 function date(value: unknown): Date | undefined {
   if (!value) return
   const raw = typeof value === 'object' ? record(value).$date : value
-  const result = new Date(raw && typeof raw === 'object' ? Number(record(raw).$numberLong) : String(raw))
+  const result = new Date(
+    raw && typeof raw === 'object' ? Number(record(raw).$numberLong) : String(raw),
+  )
   if (Number.isNaN(result.getTime())) throw new Error('Invalid timestamp in MongoDB export.')
   return result
 }
@@ -144,15 +159,24 @@ async function importLegacy(directory: string) {
 
   const database = openDatabase()
   try {
-    await database.$transaction(async (tx) => {
-      if (await tx.article.count()) throw new Error('The destination database already contains articles.')
-      await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })) })
-      await tx.comment.createMany({ data: [...byId.values()] })
-      for (const [id, parentId] of parents) await tx.comment.update({ where: { id }, data: { parentId } })
-      await tx.vote.createMany({ data: [...uniqueVotes.values()] })
-      await tx.kudos.createMany({ data: [...counts].map(([articleId, count]) => ({ articleId, count })) })
-    }, { timeout: 120000 })
-    console.log(`Imported ${byId.size} comments, ${uniqueVotes.size} vote records, and kudos totals for ${counts.size} articles.`)
+    await database.$transaction(
+      async (tx) => {
+        if (await tx.article.count())
+          throw new Error('The destination database already contains articles.')
+        await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })) })
+        await tx.comment.createMany({ data: [...byId.values()] })
+        for (const [id, parentId] of parents)
+          await tx.comment.update({ where: { id }, data: { parentId } })
+        await tx.vote.createMany({ data: [...uniqueVotes.values()] })
+        await tx.kudos.createMany({
+          data: [...counts].map(([articleId, count]) => ({ articleId, count })),
+        })
+      },
+      { timeout: 120000 },
+    )
+    console.log(
+      `Imported ${byId.size} comments, ${uniqueVotes.size} vote records, and kudos totals for ${counts.size} articles.`,
+    )
   } finally {
     await database.$disconnect()
   }
@@ -163,6 +187,8 @@ try {
   if (!directory) throw new Error('Usage: npm run db:import -- <mongo-export-directory>')
   await importLegacy(directory)
 } catch (error) {
-  console.error(error instanceof Error && error.name === 'Error' ? error.message : 'MongoDB import failed.')
+  console.error(
+    error instanceof Error && error.name === 'Error' ? error.message : 'MongoDB import failed.',
+  )
   process.exitCode = 1
 }
