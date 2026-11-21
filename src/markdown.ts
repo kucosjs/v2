@@ -3,7 +3,7 @@ import { Marked } from 'marked';
 import { safeUrl } from './http.js';
 
 const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-const escape = (text: string) => text.replace(/[&<>"']/g, (match) => entities[match]);
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (match) => entities[match]);
 
 function commentLink(href: string) {
   if (href.length > 2000) return;
@@ -18,21 +18,21 @@ const markdown = new Marked({ gfm: true, breaks: true });
 markdown.use({
   renderer: {
     html({ text }) {
-      return escape(text);
+      return escapeHtml(text);
     },
     link({ href, tokens }) {
       const label = this.parser.parseInline(tokens);
       const url = commentLink(href);
-      return url ? '<a href="' + escape(url) + '" rel="ugc nofollow noreferrer">' + label + '</a>' : label;
+      return url ? '<a href="' + escapeHtml(url) + '" rel="ugc nofollow noreferrer">' + label + '</a>' : label;
     },
     image({ text }) {
-      return escape(text);
+      return escapeHtml(text);
     },
     code({ text, lang }) {
       const language = lang?.trim().split(/\s+/)[0];
       const rendered = language && highlight.getLanguage(language)
         ? highlight.highlight(text, { language, ignoreIllegals: true }).value
-        : escape(text);
+        : escapeHtml(text);
       return '<pre><code>' + rendered + '</code></pre>\n';
     },
   },
@@ -58,7 +58,7 @@ markdown.use({
       const match = /^:"([^"\n]+)":/.exec(source);
       if (match) return { type: 'inlineQuote', raw: match[0], text: match[1] };
     },
-    renderer: ({ text }) => '<q>' + escape(text) + '</q>',
+    renderer: ({ text }) => '<q>' + escapeHtml(text) + '</q>',
   }],
 });
 
