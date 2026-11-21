@@ -120,9 +120,10 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   })
 
   admin.get('/overview', protect, async (c) => {
+    const countByArticle = database.comment.groupBy({ by: ['articleId', 'moderation'], _count: true })
     const [records, groups] = await database.$transaction([
       database.article.findMany({ where: { comments: { some: {} } }, orderBy: { url: 'asc' }, select: { id: true, url: true } }),
-      database.comment.groupBy({ by: ['articleId', 'moderation'], _count: true, orderBy: { articleId: 'asc' } }),
+      countByArticle,
     ])
     const articles = new Map(records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]))
     for (const group of groups) {
