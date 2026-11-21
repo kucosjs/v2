@@ -39,7 +39,7 @@ Comments support Markdown, including links, quotes, strikethrough, and fenced co
 | `HOST` | Optional bind address. When unset, Node listens on all interfaces. |
 | `PORT` | Defaults to `3000`. |
 | `PUBLIC_URL` | Defaults to `http://localhost:3000` and follows `PORT` when unset. This origin can always embed the widget. |
-| `DATABASE_URL` | Defaults to `file:./kucos.db`, relative to the project directory. |
+| `DATABASE_URL` | Defaults to `file:./data/kucos.sqlite`, relative to the project directory. |
 | `ALLOWED_ORIGINS` | Comma-separated HTTP(S) origins that may embed Kucos and accept writes for their own article URLs. |
 | `ADMIN_PASSWORD` | Enables the moderation dashboard. |
 | `AKISMET_API_KEY` | Enables spam checks on new and edited comments and feedback from moderator decisions. |
