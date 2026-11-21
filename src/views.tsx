@@ -130,13 +130,13 @@ export function CommentList({ comments, article, review, page, hasNext, notice }
 export function Demo({ publicUrl }: { publicUrl: string }) {
   return (
     <>
-      <h1>Comments and kudos for static sites</h1>
+      {/*<h1>Comments and kudos for static sites</h1>
       <p class="muted">Add the Kucos widget to any page on a registered site.</p>
       <pre class="snippet"><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
       <div id="kucos-comments"></div>
-      <script src="/min/kucos.min.js" defer></script>
+      <script src="/min/kucos.min.js" defer></script>*/}
 
-      {/*<section class="demo-hero" aria-labelledby="demo-title">
+      <section class="demo-hero" aria-labelledby="demo-title">
         <div class="demo-intro">
           <h1 id="demo-title">Make room for discussion.</h1>
           <p>Give readers a place to reply, write in Markdown, and leave kudos on your static site.</p>
@@ -176,7 +176,7 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
         <h2 id="demo-embed-title">Add Kucos to your site</h2>
         <p class="muted">Add your site to <code>ALLOWED_ORIGINS</code>, then paste this where you want comments to appear.</p>
         <pre class="snippet" tabindex={0}><code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code></pre>
-      </section>*/}
+      </section>
     </>
   )
 }

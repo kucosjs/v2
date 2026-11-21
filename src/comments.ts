@@ -38,6 +38,9 @@ export function publicComment(comment: CommentWithViewerVote, owner?: string) {
     authorText: hidden ? 'Hidden' : comment.author,
     comment: hidden ? 'Hidden' : renderMarkdown(comment.content),
     website: hidden || !comment.website ? null : safeUrl(comment.website)?.href ?? null,
+    avatarUrl: !hidden && comment.email?.trim()
+      ? `/api/comments/avatar/${encodeURIComponent(comment.id)}?v=${comment.updatedAt.getTime()}`
+      : null,
     parent_id: comment.parentId,
     createdOn: comment.createdAt,
     createdOnTime: timestamp.format(comment.createdAt),

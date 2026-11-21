@@ -7,7 +7,7 @@ import type { Akismet, SpamInput } from './akismet.js'
 import { canEdit, commentThreads, EDIT_WINDOW, publicComment } from './comments.js'
 import type { Config } from './config.js'
 import type { PrismaClient, Moderation } from './generated/prisma/client.js'
-import { articleUrl, clientIp, failure, requestBody, safeUrl, success, visitor, writeVisitor } from './http.js'
+import { articleUrl, clientIp, digest, failure, requestBody, safeUrl, success, visitor, writeVisitor } from './http.js'
 import { publicRateLimit } from './rate-limit.js'
 
 type Services = { database: PrismaClient; config: Config; akismet: Akismet }
@@ -150,6 +150,30 @@ export function createApi({ database, config, akismet }: Services) {
     return success(c, { comment: entry.content, author: entry.author, email: entry.email, website: entry.website })
   })
 
+  api.get('/comments/avatar/:id', async (c) => {
+    const commentId = id.safeParse(c.req.param('id'))
+    if (!commentId.success) return c.body(null, 404)
+    const comment = await database.comment.findUnique({
+      where: { id: commentId.data, moderation: 'published' },
+      select: { email: true },
+    })
+    const email = comment?.email?.trim().toLowerCase()
+    if (!email) return c.body(null, 404)
+
+    const url = `https://0.gravatar.com/avatar/${digest(email)}?s=80&d=404&r=g`
+    const avatar = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(4000) }).catch(() => null)
+    const contentType = avatar?.headers.get('Content-Type')?.split(';')[0] ?? ''
+    if (!avatar?.ok || !avatar.body || !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(contentType)) {
+      await avatar?.body?.cancel().catch(() => {})
+      return c.body(null, 404)
+    }
+    return c.body(avatar.body, 200, {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=300',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    })
+  })
+
   api.get('/comments/:id', async (c) => {
     const article = articleUrl(c.req.param('id'))
     if (!article) return failure(c, 'Invalid article URL.')
@@ -174,7 +198,7 @@ export function createApi({ database, config, akismet }: Services) {
           where: { id: msgid },
           select: { moderation: true, article: { select: { url: true } } },
         })
-        if (!comment || comment.moderation !== 'published') return null
+        if (comment?.moderation !== 'published') return null
         const article = articleUrl(comment.article.url)
         if (!article || !allowsWrite(c, article)) return false
         await tx.vote.create({ data: { commentId: msgid, visitor: owner } })

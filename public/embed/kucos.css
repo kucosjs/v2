@@ -138,16 +138,21 @@ summary { cursor: pointer; font-size: .9em; color: var(--muted); }
   column-gap: .55rem;
 }
 .kucos-avatar {
+  position: relative;
   display: grid;
   place-items: center;
   inline-size: 1.85rem;
   block-size: 1.85rem;
   border-radius: 50%;
+  overflow: hidden;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: .8rem;
   font-weight: 700;
 }
+.kucos-avatar img { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; opacity: 0; }
+.kucos-avatar-loaded { color: transparent; }
+.kucos-avatar-loaded img { opacity: 1; }
 .kucos-byline, .kucos-comment-details {
   display: flex;
   flex-wrap: wrap;

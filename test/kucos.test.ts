@@ -3,7 +3,7 @@ import { after, before, test } from 'node:test'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { createApp } from '../src/app.js'
 import { openDatabase } from '../src/database.js'
@@ -115,6 +115,50 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   assert.equal((await authorThread.json()).comments[comment.id].voted, false)
 })
 
+test('serves Gravatars for published comments without publishing email identifiers', async (context) => {
+  const email = 'avatar@example.test'
+  const hash = createHash('sha256').update(email).digest('hex')
+  const image = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
+  let available = true
+  const fetchAvatar = context.mock.method(globalThis, 'fetch', async () => available
+    ? new Response(image, { headers: { 'Content-Type': 'image/gif' } })
+    : new Response(null, { status: 404 }))
+  const articleUrl = `${site}/avatar-test`
+  const posted = await write('/api/comments', {
+    article_url: articleUrl, comment: 'A comment with an avatar', email: ` ${email.toUpperCase()} `,
+  })
+  assert.equal(posted.status, 201)
+  const { message: comment } = await posted.json()
+  assert.equal(comment.email, undefined)
+  assert.ok(comment.avatarUrl.startsWith(`/api/comments/avatar/${comment.id}?v=`))
+  const publicThread = await app.request(`/api/comments/${encodeURIComponent(articleUrl)}`)
+  const thread = await publicThread.text()
+  assert.ok(thread.includes(comment.avatarUrl))
+  assert.ok(!thread.includes(hash))
+  assert.ok(!thread.toLowerCase().includes(email))
+
+  const avatar = await app.request(comment.avatarUrl)
+  assert.equal(avatar.status, 200)
+  assert.equal(avatar.headers.get('Content-Type'), 'image/gif')
+  assert.equal(avatar.headers.get('Cross-Origin-Resource-Policy'), 'cross-origin')
+  assert.deepEqual(Buffer.from(await avatar.arrayBuffer()), image)
+  assert.equal(fetchAvatar.mock.calls[0].arguments[0], `https://0.gravatar.com/avatar/${hash}?s=80&d=404&r=g`)
+
+  available = false
+  assert.equal((await app.request(comment.avatarUrl)).status, 404)
+  const edited = await write('/api/comments', {
+    article_url: articleUrl, comment: 'An edited avatar comment', parent_id: comment.id, email: 'another@example.test',
+  }, visitor, 'PATCH')
+  assert.equal(edited.status, 200)
+  assert.notEqual((await edited.json()).message.avatarUrl, comment.avatarUrl)
+
+  const flagged = await write('/api/comments', { article_url: articleUrl, comment: 'Likely spam', email })
+  const { message: hidden } = await flagged.json()
+  assert.equal(hidden.avatarUrl, null)
+  assert.equal((await app.request(`/api/comments/avatar/${hidden.id}`)).status, 404)
+  assert.equal(fetchAvatar.mock.callCount(), 2)
+})
+
 test('Marked preserves legacy spoilers, inline quotes and links', () => {
   const html = renderMarkdown('!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).')
   assert.match(html, /<details[^>]*>.*<strong>hidden<\/strong>/s)
@@ -189,7 +233,9 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
     method: 'POST', headers: { Origin: 'http://localhost:3000' }, body: new URLSearchParams({ password: 'test-password' }),
   })
   assert.equal(login.status, 303)
-  const cookie = login.headers.get('Set-Cookie')!.split(';')[0]
+  const setCookie = login.headers.get('Set-Cookie')
+  assert.ok(setCookie)
+  const cookie = setCookie.split(';')[0]
   const overview = await app.request('/overview', { headers: { cookie } })
   assert.equal(overview.status, 200)
   assert.ok((await overview.text()).includes(`/comments?url=${encodeURIComponent(article)}`))
@@ -213,7 +259,9 @@ test('admin sessions expire after eight hours and are scoped to the running app'
     method: 'POST', body: new URLSearchParams({ password: config.adminPassword }),
   })
   assert.equal(login.status, 303)
-  const cookie = login.headers.get('Set-Cookie')!.split(';')[0]
+  const setCookie = login.headers.get('Set-Cookie')
+  assert.ok(setCookie)
+  const cookie = setCookie.split(';')[0]
   const headers = { cookie }
   assert.equal((await running.request('/overview', { headers })).status, 200)
 

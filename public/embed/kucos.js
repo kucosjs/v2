@@ -232,7 +232,7 @@
       details.append(element('summary', '', edit ? 'Edit name, website, or email' : 'Add a name, website, or email'));
       const optional = element('div', 'kucos-optional');
       for (const [name, caption, type] of [
-        ['author', 'Name', 'text'], ['website', 'Website', 'url'], ['email', 'Email (private)', 'email'],
+        ['author', 'Name', 'text'], ['website', 'Website', 'url'], ['email', 'Email (for Gravatar)', 'email'],
       ]) {
         const label = element('label', 'kucos-input', caption);
         const input = element('input');
@@ -297,6 +297,16 @@
         const [initial] = comment.authorText.trim();
         const avatar = element('span', 'kucos-avatar', initial?.toUpperCase() || '?');
         avatar.setAttribute('aria-hidden', 'true');
+        if (comment.avatarUrl) {
+          const image = element('img');
+          image.alt = '';
+          image.loading = 'lazy';
+          image.referrerPolicy = 'no-referrer';
+          image.addEventListener('load', () => avatar.classList.add('kucos-avatar-loaded'), { once: true });
+          image.addEventListener('error', () => image.remove(), { once: true });
+          image.src = new URL(comment.avatarUrl, server).href;
+          avatar.append(image);
+        }
         const author = element('strong', '', comment.authorText);
         if (comment.website) {
           const url = new URL(comment.website);

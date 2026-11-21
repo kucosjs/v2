@@ -15,19 +15,17 @@ a { color: var(--accent); text-underline-offset: .18em; }
 
 .site-header { background: var(--panel); border-bottom: 1px solid var(--line); }
 .header-inner, .main { width: min(100% - 2rem, 68rem); margin-inline: auto; }
-/**/
-.demo-page .header-inner, .demo-page .main { width: min(100% - clamp(36px, 10vw, 96px), 48rem); }
-/**/
 .header-inner { display: flex; gap: 1rem; align-items: center; min-height: 4.25rem; flex-wrap: wrap; padding-block: .65rem; }
 .brand { color: inherit; font-size: 1.3rem; font-weight: 750; text-decoration: none; letter-spacing: -.035em; }
 .brand span { color: var(--accent); }
 .header-inner nav { display: flex; gap: .4rem; margin-inline: auto; }
 .header-inner nav a { padding: .4rem .65rem; border-radius: .4rem; color: var(--muted); text-decoration: none; }
 .header-inner nav [aria-current] { background: #e9eeff; color: #1b3ca9; font-weight: 600; }
-.header-inner > .quiet { margin-inline-start: auto; }
 .quiet { color: var(--muted); font-size: .9rem; }
+.header-inner > .quiet { margin-inline-start: auto; }
 
 .main { padding-block: clamp(2rem, 6vw, 4rem); }
+.demo-page .header-inner, .demo-page .main { width: min(100% - clamp(36px, 10vw, 96px), 48rem); }
 h1 { margin: 0 0 1rem; line-height: 1.15; font-size: clamp(1.7rem, 4.3vw, 2.7rem); letter-spacing: -.04em; }
 .muted { color: var(--muted); }
 .sign-in { width: min(100% - 2rem, 29rem); }
@@ -37,12 +35,12 @@ h1 { margin: 0 0 1rem; line-height: 1.15; font-size: clamp(1.7rem, 4.3vw, 2.7rem
 .login-card form { display: grid; gap: .65rem; margin-top: 1.25rem; }
 .login-card label { font-size: .9rem; font-weight: 650; }
 .login-card input { width: 100%; background: white; padding: .65rem; color: inherit; font: inherit; border: 1px solid var(--line); border-radius: .4rem; }
-.login-card button { justify-self: start; }
 .error { color: #9c2e2b; margin: 0; }
 .notice { padding: .8rem 1rem; border: 1px solid var(--line); border-radius: .55rem; background: #edf2fc; }
 
 button { cursor: pointer; padding: .45rem .8rem; border: 1px solid var(--line); border-radius: .45rem; background: var(--panel); color: inherit; font: inherit; font-size: .875rem; font-weight: 600; }
 button:hover { border-color: var(--accent); }
+.login-card button { justify-self: start; }
 .primary { background: var(--accent); border-color: var(--accent); color: white; }
 .primary:hover { background: #1b3ca9; }
 .danger { color: #a83736; }
@@ -70,7 +68,7 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
 .pagination { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1rem; }
 .snippet { margin-bottom: 2rem; }
 
-/*
+
 .demo-page {
   --panel: #fffdf8;
   --line: #ded8cc;
@@ -182,4 +180,3 @@ td:not(:first-child) { font-variant-numeric: tabular-nums; }
 @media (max-width: 44rem) {
   .demo-hero { grid-template-columns: minmax(0, 1fr); }
 }
-*/
