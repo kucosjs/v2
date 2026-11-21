@@ -1,6 +1,19 @@
-# Kucos
+<p align="center">
+  <img src="docs/images/kucos-logo.svg" width="88" height="88" alt="">
+</p>
 
-Kucos adds anonymous comments and kudos to static websites. The Node.js server runs on Hono, stores data in SQLite through Prisma, and can send comments to Akismet for spam detection.
+<h1 align="center">Kucos</h1>
+
+<p align="center">
+  <a href="#run-locally"><img alt="Node.js 22.12+" src="https://img.shields.io/badge/Node.js-22.12%2B-356a32?style=flat-square&amp;logo=nodedotjs&amp;logoColor=white"></a>
+  <a href="https://hono.dev/"><img alt="Built with Hono" src="https://img.shields.io/badge/Hono-framework-b74618?style=flat-square&amp;logo=hono&amp;logoColor=white"></a>
+  <a href="https://www.prisma.io/"><img alt="Prisma ORM" src="https://img.shields.io/badge/Prisma-ORM-303946?style=flat-square&amp;logo=prisma&amp;logoColor=white"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/License-MIT-50545a?style=flat-square"></a>
+</p>
+
+Kucos adds anonymous comments and kudos to static websites. The Node.js server runs on Hono, stores data in SQLite/Postgres through Prisma, and can send comments to Akismet for spam detection.
+
+![Kucos embedded on a sample article, showing a pinned comment, a nested reply, voting, and kudos](docs/images/kucos-in-action.png)
 
 ## Run locally
 
