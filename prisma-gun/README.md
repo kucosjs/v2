@@ -13,15 +13,15 @@ DATABASE_URL=http://localhost:8765/gun
 Initialize your generated Prisma Client once with `withGun`.
 
 ```js
-import { PrismaClient } from './generated/prisma/client.js'
-import { gunStubAdapter, withGun } from 'prisma-gun'
+import { PrismaClient } from './generated/prisma/client.js';
+import { gunStubAdapter, withGun } from 'prisma-gun';
 
-const peers = process.env.DATABASE_URL.split(',').map((peer) => peer.trim())
+const peers = process.env.DATABASE_URL.split(',').map((peer) => peer.trim());
 
 export const db = withGun(new PrismaClient({ adapter: gunStubAdapter }), {
   peers,
   name: 'my-app',
-})
+});
 ```
 
 Use your project's generated client import path and load your environment before this module runs. The supplied stub matches the Prisma client's `sqlite` provider metadata. Model operations go to Gun, and Gun initializes its own records on first use.
