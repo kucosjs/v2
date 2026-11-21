@@ -1,5 +1,5 @@
-import Gun from 'gun';
 import { randomUUID } from 'node:crypto';
+import Gun from 'gun';
 
 const once = (ref, wait) =>
   new Promise((resolve) => {
@@ -113,9 +113,7 @@ function matchField(v, cond) {
       case 'mode':
         break;
       default:
-        throw new Error(
-          `prisma-gun: unsupported filter "${op}" (relation filters need include support)`,
-        );
+        throw new Error(`prisma-gun: unsupported filter "${op}" (relation filters need include support)`);
     }
   }
   return true;
@@ -194,11 +192,7 @@ class GunStore {
     return n && typeof n.json === 'string' ? JSON.parse(n.json) : null;
   }
   async write(model, row) {
-    await put(
-      this.ref(model, row.id),
-      { json: JSON.stringify(row), updatedAt: Date.now() },
-      this.wait,
-    );
+    await put(this.ref(model, row.id), { json: JSON.stringify(row), updatedAt: Date.now() }, this.wait);
     return row;
   }
   async remove(model, id) {
@@ -213,8 +207,7 @@ class GunStore {
       case 'findFirstOrThrow': {
         let row = null;
         const w = args.where ?? {};
-        if ('id' in w && (w.id === null || typeof w.id !== 'object'))
-          row = await this.read(model, w.id);
+        if ('id' in w && (w.id === null || typeof w.id !== 'object')) row = await this.read(model, w.id);
         if (row && !matches(row, w)) row = null;
         if (!row) row = applyQuery(await this.all(model), { ...args, take: 1 })[0] ?? null;
         if (!row && op.endsWith('OrThrow')) throw new Error(`prisma-gun: ${model} not found`);

@@ -1,5 +1,5 @@
-import { jsxRenderer } from 'hono/jsx-renderer'
 import { raw } from 'hono/html'
+import { jsxRenderer } from 'hono/jsx-renderer'
 import type { CommentWithArticle } from './comments.js'
 import { safeUrl } from './http.js'
 import { renderMarkdown } from './markdown.js'
@@ -60,13 +60,7 @@ export function SignIn({ error, configured }: { error?: string; configured: bool
       {configured ? (
         <form action="/login" method="post">
           <label for="password">Admin password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            autocomplete="current-password"
-            required
-          />
+          <input type="password" id="password" name="password" autocomplete="current-password" required />
           {error && (
             <p role="alert" class="error">
               {error}
@@ -170,27 +164,20 @@ export function CommentList({ comments, article, review, page, hasNext, notice }
           {notice}
         </p>
       )}
-      {!comments.length && (
-        <p class="notice">{review ? 'The review queue is empty.' : 'No comments on this page.'}</p>
-      )}
+      {!comments.length && <p class="notice">{review ? 'The review queue is empty.' : 'No comments on this page.'}</p>}
       <div class="comment-list">
         {comments.map((comment) => (
           <article class="comment-card">
             <header>
               <strong>{comment.author}</strong>
-              <time datetime={comment.createdAt.toISOString()}>
-                {date.format(comment.createdAt)} UTC
-              </time>
+              <time datetime={comment.createdAt.toISOString()}>{date.format(comment.createdAt)} UTC</time>
               {comment.moderation !== 'published' && (
                 <span class="tag">{comment.moderation === 'spam' ? 'Spam' : 'Pending'}</span>
               )}
               {comment.pinned && <span class="tag">Pinned</span>}
             </header>
             {review && (
-              <a
-                href={`/comments?url=${encodeURIComponent(comment.article.url)}`}
-                class="article-link"
-              >
+              <a href={`/comments?url=${encodeURIComponent(comment.article.url)}`} class="article-link">
                 {comment.article.url}
               </a>
             )}
@@ -236,9 +223,7 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
       <section class="demo-hero" aria-labelledby="demo-title">
         <div class="demo-intro">
           <h1 id="demo-title">Make room for discussion.</h1>
-          <p>
-            Give readers a place to reply, write in Markdown, and leave kudos on your static site.
-          </p>
+          <p>Give readers a place to reply, write in Markdown, and leave kudos on your static site.</p>
           <div class="demo-actions">
             <a class="demo-button" href="#discussion">
               Try the widget <span aria-hidden="true">↓</span>
@@ -286,8 +271,7 @@ export function Demo({ publicUrl }: { publicUrl: string }) {
       <section id="embed" class="demo-section" aria-labelledby="demo-embed-title">
         <h2 id="demo-embed-title">Add Kucos to your site</h2>
         <p class="muted">
-          Add your site to <code>ALLOWED_ORIGINS</code>, then paste this where you want comments to
-          appear.
+          Add your site to <code>ALLOWED_ORIGINS</code>, then paste this where you want comments to appear.
         </p>
         <pre class="snippet" tabindex={0}>
           <code>{`<div id="kucos-comments"></div>\n<script src="${publicUrl}/min/kucos.min.js" defer></script>`}</code>

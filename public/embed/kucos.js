@@ -137,17 +137,12 @@
     }
 
     function showError(status, error) {
-      status.textContent =
-        error instanceof Error ? error.message : 'Kucos could not complete the request.';
+      status.textContent = error instanceof Error ? error.message : 'Kucos could not complete the request.';
     }
 
     function focusComment(target) {
       if (!target) return;
-      for (
-        let parent = target.parentElement;
-        parent && parent !== thread;
-        parent = parent.parentElement
-      ) {
+      for (let parent = target.parentElement; parent && parent !== thread; parent = parent.parentElement) {
         if (parent.tagName === 'DETAILS') parent.open = true;
       }
       target.focus({ preventScroll: true });
@@ -181,9 +176,7 @@
         const nodes = renderThread(comments);
         const list = element('ul', 'kucos-thread');
         list.append(...nodes);
-        thread.replaceChildren(
-          nodes.length ? list : element('p', 'kucos-empty', 'No comments yet.'),
-        );
+        thread.replaceChildren(nodes.length ? list : element('p', 'kucos-empty', 'No comments yet.'));
         focusPermalink(location.hash, !submission);
         if (submission) {
           const target = submission.id && shadow.getElementById(`comment-${submission.id}`);
@@ -218,11 +211,7 @@
     function commentForm({ parentId, draft, text = '', close } = {}) {
       const edit = Boolean(draft);
       const form = element('form', 'kucos-form');
-      const label = element(
-        'label',
-        'kucos-input',
-        edit ? 'Edit comment' : parentId ? 'Your reply' : 'Your comment',
-      );
+      const label = element('label', 'kucos-input', edit ? 'Edit comment' : parentId ? 'Your reply' : 'Your comment');
       const field = element('textarea');
       field.name = 'comment';
       field.rows = 3;
@@ -259,13 +248,7 @@
       form.append(formats);
 
       const details = element('details', 'kucos-details');
-      details.append(
-        element(
-          'summary',
-          '',
-          edit ? 'Edit name, website, or email' : 'Add a name, website, or email',
-        ),
-      );
+      details.append(element('summary', '', edit ? 'Edit name, website, or email' : 'Add a name, website, or email'));
       const optional = element('div', 'kucos-optional');
       for (const [name, caption, type] of [
         ['author', 'Name', 'text'],
@@ -340,10 +323,7 @@
         .sort((a, b) => b.sticky - a.sticky)
         .map((comment) => {
           const node = element('li', 'kucos-entry');
-          const card = element(
-            'article',
-            comment.spam ? 'kucos-comment kucos-comment-flagged' : 'kucos-comment',
-          );
+          const card = element('article', comment.spam ? 'kucos-comment kucos-comment-flagged' : 'kucos-comment');
           card.id = `comment-${comment.id}`;
           card.tabIndex = -1;
           const meta = element('div', 'kucos-meta');
@@ -470,8 +450,7 @@
             meta.append(votes);
             function selectedText() {
               const selection = shadow.getSelection?.() ?? window.getSelection();
-              return content.contains(selection?.anchorNode) &&
-                content.contains(selection?.focusNode)
+              return content.contains(selection?.anchorNode) && content.contains(selection?.focusNode)
                 ? String(selection).trim().slice(0, 2000)
                 : '';
             }
@@ -514,19 +493,12 @@
 
           const replies = renderThread(comment.children, depth + 1);
           if (replies.length) {
-            const details = element(
-              'details',
-              depth >= 5 ? 'kucos-replies kucos-replies-compact' : 'kucos-replies',
-            );
+            const details = element('details', depth >= 5 ? 'kucos-replies kucos-replies-compact' : 'kucos-replies');
             details.open = true;
             const list = element('ul', 'kucos-thread');
             list.append(...replies);
             details.append(
-              element(
-                'summary',
-                '',
-                `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`,
-              ),
+              element('summary', '', `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`),
               list,
             );
             node.append(details);
@@ -547,7 +519,6 @@
       .catch((error) => showError(notice, error));
   }
 
-  if (document.readyState === 'loading')
-    document.addEventListener('DOMContentLoaded', start, { once: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 })();

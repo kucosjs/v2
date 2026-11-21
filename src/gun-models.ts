@@ -76,8 +76,6 @@ export function gunPeer(value: string) {
     }),
   )
   if (peers.size !== 1)
-    throw new Error(
-      'Gun record storage requires one relay. HTTP and WebSocket aliases can refer to the same relay.',
-    )
+    throw new Error('Gun record storage requires one relay. HTTP and WebSocket aliases can refer to the same relay.')
   return [...peers][0]
 }

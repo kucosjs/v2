@@ -1,16 +1,16 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { secureHeaders } from 'hono/secure-headers'
 import { z } from 'zod'
-import type { Context } from 'hono'
-import type { Config } from './config.js'
 import type { Akismet } from './akismet.js'
 import type { CommentWithArticle } from './comments.js'
+import type { Config } from './config.js'
 import type { PrismaClient } from './generated/prisma/client.js'
 import { articleUrl, clientIp, digest, failure, requestBody, success } from './http.js'
-import { CommentList, Demo, Overview, SignIn, renderer } from './views.js'
+import { CommentList, Demo, Overview, renderer, SignIn } from './views.js'
 
 const sessionCookie = 'kucos_admin'
 const sessionSeconds = 8 * 60 * 60
@@ -58,9 +58,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     const fetchSite = c.req.header('Sec-Fetch-Site')
     if (
       !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
-      (origin
-        ? origin !== config.publicUrl
-        : fetchSite && !['same-origin', 'none'].includes(fetchSite))
+      (origin ? origin !== config.publicUrl : fetchSite && !['same-origin', 'none'].includes(fetchSite))
     ) {
       return failure(c, 'Invalid request origin.', 403)
     }
@@ -88,9 +86,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     if (session(c)) return c.redirect('/overview')
     return c.render(<SignIn configured={!!config.adminPassword} />, { title: 'Sign in' })
   })
-  admin.get('/demo', (c) =>
-    c.render(<Demo publicUrl={config.publicUrl} />, { title: 'Widget demo', area: 'demo' }),
-  )
+  admin.get('/demo', (c) => c.render(<Demo publicUrl={config.publicUrl} />, { title: 'Widget demo', area: 'demo' }))
 
   admin.post('/login', async (c) => {
     const body = z.object({ password: z.string().max(4096) }).safeParse(await requestBody(c))
@@ -116,10 +112,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     }
     if (
       !body.success ||
-      !timingSafeEqual(
-        Buffer.from(digest(body.data.password)),
-        Buffer.from(digest(config.adminPassword)),
-      )
+      !timingSafeEqual(Buffer.from(digest(body.data.password)), Buffer.from(digest(config.adminPassword)))
     ) {
       attempts.set(key, {
         count: (attempt?.count ?? 0) + 1,
@@ -163,9 +156,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
       }),
       countByArticle,
     ])
-    const articles = new Map(
-      records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]),
-    )
+    const articles = new Map(records.map(({ id, url }) => [id, { article: url, total: 0, review: 0 }]))
     for (const group of groups) {
       const stats = articles.get(group.articleId)
       if (!stats) continue
@@ -193,10 +184,7 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
       take: pageSize + 1,
     })
     const updated = c.req.query('updated')
-    const notice =
-      updated && Object.hasOwn(notices, updated)
-        ? notices[updated as keyof typeof notices]
-        : undefined
+    const notice = updated && Object.hasOwn(notices, updated) ? notices[updated as keyof typeof notices] : undefined
     return c.render(
       <CommentList
         comments={comments.slice(0, pageSize)}

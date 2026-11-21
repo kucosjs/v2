@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { withGun, gunStubAdapter } from 'prisma-gun';
+import { gunStubAdapter, withGun } from 'prisma-gun';
 
 const db = withGun(new PrismaClient({ adapter: gunStubAdapter }), {
   peers: process.env.DATABASE_URL.split(',').map((s) => s.trim()),

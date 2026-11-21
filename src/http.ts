@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { isIP } from 'node:net'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
+import { getCookie, setCookie } from 'hono/cookie'
 import type { Config } from './config.js'
 
 export function digest(value: string) {
@@ -27,9 +27,7 @@ export function articleUrl(value: string) {
 
 export function clientIp(c: Context, proxyHops: number) {
   if (proxyHops) {
-    const addresses = (c.req.header('X-Forwarded-For') ?? '')
-      .split(',')
-      .map((address) => address.trim())
+    const addresses = (c.req.header('X-Forwarded-For') ?? '').split(',').map((address) => address.trim())
     const address = addresses.at(-proxyHops)
     if (address && isIP(address)) return address
   }

@@ -1,8 +1,8 @@
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { gunRecordsStubAdapter, withGunRecords } from 'prisma-gun/records'
-import { PrismaClient } from './generated/prisma/client.js'
 import { databaseUrl } from './config.js'
+import { PrismaClient } from './generated/prisma/client.js'
 import { gunModels, gunPeer } from './gun-models.js'
 
 export function openDatabase(url = databaseUrl) {

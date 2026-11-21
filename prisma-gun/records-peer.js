@@ -6,10 +6,7 @@ async function withTimeout(work, operation) {
     return await Promise.race([
       work,
       new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`Gun relay timed out during ${operation}.`)),
-          timeoutMs,
-        );
+        timer = setTimeout(() => reject(new Error(`Gun relay timed out during ${operation}.`)), timeoutMs);
       }),
     ]);
   } finally {
@@ -52,11 +49,9 @@ export async function openRecordsPeer(peer, name) {
         reference.once(resolve, { wait: 500 });
       });
       const [node] = await withTimeout(Promise.all([reading, connected]), 'read');
-      if (socket?.readyState !== WebSocket.OPEN)
-        throw new Error('Gun relay disconnected during read.');
+      if (socket?.readyState !== WebSocket.OPEN) throw new Error('Gun relay disconnected during read.');
       if (node === undefined) return null;
-      if (typeof node.records !== 'string')
-        throw new Error('Gun relay returned an invalid record set.');
+      if (typeof node.records !== 'string') throw new Error('Gun relay returned an invalid record set.');
       return JSON.parse(node.records);
     },
     async write(state) {

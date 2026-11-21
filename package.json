@@ -20,7 +20,7 @@
     "build:widget": "esbuild public/embed/kucos.js public/embed/kucos.css --minify --target=es2020 --outdir=dist/widget --out-extension:.js=.min.js --out-extension:.css=.min.css",
     "test": "node --import tsx --test test/*.test.ts",
     "lint": "biome lint .",
-    "format": "biome format --write ."
+    "format": "biome check --write --linter-enabled=false ."
   },
   "dependencies": {
     "prisma-gun": "file:./prisma-gun/",

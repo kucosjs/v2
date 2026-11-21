@@ -72,9 +72,7 @@ export function createAkismet(config: Config): Akismet {
     async feedback(input, decision) {
       if (!key) return
       const { client, comment } = request(input)
-      await deadline(
-        decision === 'submit-spam' ? client.submitSpam(comment) : client.submitHam(comment),
-      )
+      await deadline(decision === 'submit-spam' ? client.submitSpam(comment) : client.submitHam(comment))
     },
   }
 }

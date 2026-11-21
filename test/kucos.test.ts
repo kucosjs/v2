@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
-import { after, before, test } from 'node:test'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
+import { after, before, test } from 'node:test'
 import { createApp } from '../src/app.js'
-import { openDatabase } from '../src/database.js'
 import { commentThreads } from '../src/comments.js'
-import { renderMarkdown } from '../src/markdown.js'
+import { openDatabase } from '../src/database.js'
 import type { Comment } from '../src/generated/prisma/client.js'
+import { renderMarkdown } from '../src/markdown.js'
 import { startGunRelay } from './gun-relay.js'
 
 const migrations = new URL('../prisma/migrations/', import.meta.url)
@@ -16,9 +16,7 @@ const directory = mkdtempSync(join(tmpdir(), 'kucos-test-'))
 const filename = join(directory, 'test.db')
 const useGun = process.argv.includes('--gun')
 let relay = useGun ? await startGunRelay(directory) : undefined
-const database = openDatabase(
-  relay ? `${relay.peer.replace('ws:', 'http:')},${relay.peer}` : `file:${filename}`,
-)
+const database = openDatabase(relay ? `${relay.peer.replace('ws:', 'http:')},${relay.peer}` : `file:${filename}`)
 const article = 'https://site.example/notes/100%25?next=%2F'
 const site = new URL(article).origin
 const visitor = randomUUID()
@@ -99,10 +97,7 @@ test('threads replies, validates edits and keeps email and unsafe markup out of 
   assert.equal(comment.email, undefined)
   const draftPath = `/api/comments/edit/${comment.id}`
   const ownerHeaders = { 'X-Kucos-Visitor': visitor }
-  assert.equal(
-    (await app.request(draftPath, { headers: { 'X-Kucos-Visitor': otherVisitor } })).status,
-    404,
-  )
+  assert.equal((await app.request(draftPath, { headers: { 'X-Kucos-Visitor': otherVisitor } })).status, 404)
   const draft = await app.request(draftPath, { headers: ownerHeaders })
   assert.equal(draft.status, 200)
   assert.equal((await draft.json()).message.email, 'author@example.test')
@@ -191,9 +186,7 @@ test('serves Gravatars for published comments without publishing email identifie
   const image = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
   let available = true
   const fetchAvatar = context.mock.method(globalThis, 'fetch', async () =>
-    available
-      ? new Response(image, { headers: { 'Content-Type': 'image/gif' } })
-      : new Response(null, { status: 404 }),
+    available ? new Response(image, { headers: { 'Content-Type': 'image/gif' } }) : new Response(null, { status: 404 }),
   )
   const articleUrl = `${site}/avatar-test`
   const posted = await write('/api/comments', {
@@ -216,10 +209,7 @@ test('serves Gravatars for published comments without publishing email identifie
   assert.equal(avatar.headers.get('Content-Type'), 'image/gif')
   assert.equal(avatar.headers.get('Cross-Origin-Resource-Policy'), 'cross-origin')
   assert.deepEqual(Buffer.from(await avatar.arrayBuffer()), image)
-  assert.equal(
-    fetchAvatar.mock.calls[0].arguments[0],
-    `https://0.gravatar.com/avatar/${hash}?s=80&d=404&r=g`,
-  )
+  assert.equal(fetchAvatar.mock.calls[0].arguments[0], `https://0.gravatar.com/avatar/${hash}?s=80&d=404&r=g`)
 
   available = false
   assert.equal((await app.request(comment.avatarUrl)).status, 404)
@@ -249,9 +239,7 @@ test('serves Gravatars for published comments without publishing email identifie
 })
 
 test('Marked preserves legacy spoilers, inline quotes and links', () => {
-  const html = renderMarkdown(
-    '!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).',
-  )
+  const html = renderMarkdown('!**hidden**\n! next line\n\nA :"quote": and [relative link](/guide).')
   assert.match(html, /<details[^>]*>.*<strong>hidden<\/strong>/s)
   assert.match(html, /<br>\s*next line/)
   assert.match(html, /<q>quote<\/q>/)
@@ -433,10 +421,7 @@ test('the public API limits reads and writes separately for each client IP', asy
   assert.match(denied.headers.get('Retry-After') ?? '', /^(?:[1-9]|[1-5][0-9]|60)$/)
   assert.equal(denied.headers.get('Access-Control-Allow-Origin'), site)
   assert.match(denied.headers.get('Access-Control-Expose-Headers') ?? '', /Retry-After/i)
-  assert.equal(
-    (await limited.request('/api/kudos', { method: 'POST', headers, body: '{}' })).status,
-    429,
-  )
+  assert.equal((await limited.request('/api/kudos', { method: 'POST', headers, body: '{}' })).status, 429)
   assert.equal((await write({ ...headers, 'X-Forwarded-For': '192.0.2.11' })).status, 400)
 
   for (let index = 0; index < 360; index++) {
@@ -534,10 +519,7 @@ if (useGun) {
       const comments = await restored.comment.findMany({ where: { articleId: saved.id } })
       assert.equal(comments.length, 2)
       assert.equal(comments.find((comment) => comment.parentId === null)?.likes, 1)
-      assert.equal(
-        (await restored.kudos.findUniqueOrThrow({ where: { articleId: saved.id } })).count,
-        1,
-      )
+      assert.equal((await restored.kudos.findUniqueOrThrow({ where: { articleId: saved.id } })).count, 1)
       assert.equal(existsSync(filename), false)
     } finally {
       await restored.$disconnect()

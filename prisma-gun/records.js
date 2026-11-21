@@ -11,15 +11,7 @@ export const gunRecordsStubAdapter = {
   },
 };
 
-const mutations = new Set([
-  'create',
-  'createMany',
-  'update',
-  'updateManyAndReturn',
-  'upsert',
-  'delete',
-  'deleteMany',
-]);
+const mutations = new Set(['create', 'createMany', 'update', 'updateManyAndReturn', 'upsert', 'delete', 'deleteMany']);
 
 export function withGunRecords(prisma, { peer, name = 'app', models }) {
   const execute = createQueries(models);

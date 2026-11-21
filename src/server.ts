@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server'
-import app, { config, database } from './index.js'
 import { hostname, port } from './config.js'
+import app, { config, database } from './index.js'
 
 await database.$connect()
 

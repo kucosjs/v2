@@ -1,23 +1,13 @@
+import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { z } from 'zod'
-import type { Context } from 'hono'
 import type { Akismet, SpamInput } from './akismet.js'
 import { canEdit, commentThreads, EDIT_WINDOW, publicComment } from './comments.js'
 import type { Config } from './config.js'
-import type { PrismaClient, Moderation } from './generated/prisma/client.js'
-import {
-  articleUrl,
-  clientIp,
-  digest,
-  failure,
-  requestBody,
-  safeUrl,
-  success,
-  visitor,
-  writeVisitor,
-} from './http.js'
+import type { Moderation, PrismaClient } from './generated/prisma/client.js'
+import { articleUrl, clientIp, digest, failure, requestBody, safeUrl, success, visitor, writeVisitor } from './http.js'
 import { publicRateLimit } from './rate-limit.js'
 
 type Services = { database: PrismaClient; config: Config; akismet: Akismet }
@@ -29,10 +19,7 @@ const commentInput = z.object({
   comment: z.string().trim().min(4).max(4999),
   author: optionalText,
   email: optionalText,
-  website: optionalText.refine(
-    (value) => !value || !!safeUrl(value),
-    'Use an HTTP(S) website URL.',
-  ),
+  website: optionalText.refine((value) => !value || !!safeUrl(value), 'Use an HTTP(S) website URL.'),
   parent_id: id.or(z.literal('')).optional(),
 })
 const voteInput = z.object({ msgid: id, action: z.enum(['upvote', 'downvote']) })
@@ -64,8 +51,7 @@ export function createApi({ database, config, akismet }: Services) {
   function allowsWrite(c: Context, article: URL) {
     const origin = c.req.header('Origin')
     return (
-      config.allowedOrigins.has(article.origin) &&
-      (!origin || origin === article.origin || origin === config.publicUrl)
+      config.allowedOrigins.has(article.origin) && (!origin || origin === article.origin || origin === config.publicUrl)
     )
   }
 
@@ -85,16 +71,12 @@ export function createApi({ database, config, akismet }: Services) {
     }
     const result = commentInput.safeParse(body)
     if (!result.success)
-      return failure(
-        c,
-        'Enter a comment between 4 and 4999 characters and check the optional fields.',
-      )
+      return failure(c, 'Enter a comment between 4 and 4999 characters and check the optional fields.')
 
     const input = result.data
     const article = articleUrl(input.article_url)
     if (!article) return failure(c, 'Invalid article URL.')
-    if (!allowsWrite(c, article))
-      return failure(c, 'This article cannot accept comments from this origin.', 403)
+    if (!allowsWrite(c, article)) return failure(c, 'This article cannot accept comments from this origin.', 403)
 
     const editing = c.req.method === 'PATCH'
     const owner = writeVisitor(c, config)
@@ -116,10 +98,7 @@ export function createApi({ database, config, akismet }: Services) {
     const previous = editing && linked ? linked : undefined
     const now = new Date()
     const data = {
-      author:
-        input.author === undefined
-          ? (previous?.author ?? 'Anonymous')
-          : input.author || 'Anonymous',
+      author: input.author === undefined ? (previous?.author ?? 'Anonymous') : input.author || 'Anonymous',
       content: input.comment,
       email: input.email === undefined ? (previous?.email ?? null) : input.email || null,
       website: input.website === undefined ? (previous?.website ?? null) : input.website || null,
@@ -146,8 +125,7 @@ export function createApi({ database, config, akismet }: Services) {
           updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)),
         },
       })
-      if (!updated.length)
-        return failure(c, 'This comment changed or can no longer be edited.', 409)
+      if (!updated.length) return failure(c, 'This comment changed or can no longer be edited.', 409)
       return success(c, publicComment(updated[0], owner))
     }
 
@@ -195,8 +173,7 @@ export function createApi({ database, config, akismet }: Services) {
 
   api.get('/comments/edit/:id', async (c) => {
     const entry = await database.comment.findUnique({ where: { id: c.req.param('id') } })
-    if (!entry || !canEdit(entry, visitor(c)))
-      return failure(c, 'Comment not found or no longer editable.', 404)
+    if (!entry || !canEdit(entry, visitor(c))) return failure(c, 'Comment not found or no longer editable.', 404)
     return success(c, {
       comment: entry.content,
       author: entry.author,
@@ -216,9 +193,7 @@ export function createApi({ database, config, akismet }: Services) {
     if (!email) return c.body(null, 404)
 
     const url = `https://0.gravatar.com/avatar/${digest(email)}?s=80&d=404&r=g`
-    const avatar = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(4000) }).catch(
-      () => null,
-    )
+    const avatar = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(4000) }).catch(() => null)
     const contentType = avatar?.headers.get('Content-Type')?.split(';')[0] ?? ''
     if (!avatar?.ok || !avatar.body || !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(contentType)) {
       await avatar?.body?.cancel().catch(() => {})
@@ -270,8 +245,7 @@ export function createApi({ database, config, akismet }: Services) {
       return success(c, { ...updated, score: updated.likes - updated.dislikes })
     } catch (error) {
       if (knownError(error, 'P2002')) return failure(c, 'You already voted on this comment.')
-      if (knownError(error, 'P2003') || knownError(error, 'P2025'))
-        return failure(c, 'Comment not found.', 404)
+      if (knownError(error, 'P2003') || knownError(error, 'P2025')) return failure(c, 'Comment not found.', 404)
       throw error
     }
   })
@@ -294,8 +268,7 @@ export function createApi({ database, config, akismet }: Services) {
     if (!result.success) return failure(c, 'Provide an article URL and kudos action.')
     const requestedArticle = articleUrl(result.data.id)
     if (!requestedArticle) return failure(c, 'Invalid article URL.')
-    if (!allowsWrite(c, requestedArticle))
-      return failure(c, 'Kudos are not allowed from this origin.', 403)
+    if (!allowsWrite(c, requestedArticle)) return failure(c, 'Kudos are not allowed from this origin.', 403)
 
     const url = requestedArticle.href
     const owner = writeVisitor(c, config)
@@ -321,14 +294,12 @@ export function createApi({ database, config, akismet }: Services) {
         const where = { articleId_visitor: { articleId, visitor: owner } }
         if (await tx.kudosMember.findUnique({ where })) return kudos.count
         await tx.kudosMember.create({ data: { articleId, visitor: owner } })
-        return (await tx.kudos.update({ where: { articleId }, data: { count: { increment: 1 } } }))
-          .count
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { increment: 1 } } })).count
       }
 
       const removed = await tx.kudosMember.deleteMany({ where: { articleId, visitor: owner } })
       if (removed.count) {
-        return (await tx.kudos.update({ where: { articleId }, data: { count: { decrement: 1 } } }))
-          .count
+        return (await tx.kudos.update({ where: { articleId }, data: { count: { decrement: 1 } } })).count
       }
       return (await tx.kudos.findUnique({ where: { articleId } }))?.count ?? 0
     })

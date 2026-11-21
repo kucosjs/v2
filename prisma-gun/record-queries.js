@@ -128,21 +128,13 @@ export function createQueries(models) {
       if (value && typeof value === 'object' && !(value instanceof Date)) {
         if (Object.hasOwn(value, 'increment')) row[field] += value.increment;
         else if (Object.hasOwn(value, 'decrement')) row[field] -= value.decrement;
-        else
-          throw new Error(
-            `Gun storage does not support updating ${model}.${field} with an object.`,
-          );
+        else throw new Error(`Gun storage does not support updating ${model}.${field} with an object.`);
       } else row[field] = persisted(value);
     }
 
     for (const keys of [definition.key, ...(definition.unique ?? [])]) {
-      if (keys.some((key) => row[key] == null))
-        throw new Error(`Gun storage is missing a key for ${model}.`);
-      if (
-        state[model].some(
-          (other) => other !== previous && keys.every((key) => other[key] === row[key]),
-        )
-      ) {
+      if (keys.some((key) => row[key] == null)) throw new Error(`Gun storage is missing a key for ${model}.`);
+      if (state[model].some((other) => other !== previous && keys.every((key) => other[key] === row[key]))) {
         fail('P2002', `Duplicate ${model} record.`);
       }
     }
