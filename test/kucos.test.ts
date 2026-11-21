@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -10,7 +10,7 @@ import { openDatabase } from '../src/database.js'
 import { commentThreads } from '../src/comments.js'
 import type { Comment } from '../src/generated/prisma/client.js'
 
-const baseline = readFileSync(new URL('../prisma/migrations/20261121010000_initial/migration.sql', import.meta.url), 'utf8')
+const migrations = new URL('../prisma/migrations/', import.meta.url)
 const directory = mkdtempSync(join(tmpdir(), 'kucos-test-'))
 const filename = join(directory, 'test.db')
 const database = openDatabase(`file:${filename}`)
@@ -42,7 +42,11 @@ const app = createApp({
 
 before(() => {
   const sqlite = new DatabaseSync(filename)
-  sqlite.exec(baseline)
+  const directories = readdirSync(migrations, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+  for (const directory of directories) {
+    sqlite.exec(readFileSync(new URL(`${directory}/migration.sql`, migrations), 'utf8'))
+  }
   sqlite.close()
 })
 after(async () => {
@@ -179,6 +183,26 @@ test('holds spam and check failures, supports moderation and revokes admin sessi
   assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 200)
   assert.equal((await app.request('/logout', { method: 'POST', headers: { cookie } })).status, 303)
   assert.equal((await app.request('/spam', { headers: { cookie } })).status, 302)
+})
+
+test('admin sessions expire after eight hours and are scoped to the running app', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+  const running = createApp({ database, config })
+  const login = await running.request('/login', {
+    method: 'POST', body: new URLSearchParams({ password: config.adminPassword }),
+  })
+  assert.equal(login.status, 303)
+  const cookie = login.headers.get('Set-Cookie')!.split(';')[0]
+  const headers = { cookie }
+  assert.equal((await running.request('/overview', { headers })).status, 200)
+
+  const restarted = createApp({ database, config })
+  assert.equal((await restarted.request('/overview', { headers })).status, 302)
+
+  context.mock.timers.tick(8 * 60 * 60 * 1000 - 1)
+  assert.equal((await running.request('/overview', { headers })).status, 200)
+  context.mock.timers.tick(1)
+  assert.equal((await running.request('/overview', { headers })).status, 302)
 })
 
 test('only registered origins may preflight and post to their own articles', async () => {

@@ -31,6 +31,7 @@ function pageNumber(value?: string) {
 export function createAdmin(database: PrismaClient, config: Config, akismet: Akismet) {
   const admin = new Hono()
   const attempts = new Map<string, { count: number; until: number }>()
+  const sessions = new Map<string, number>()
   const cookieOptions = { path: '/', httpOnly: true, sameSite: 'Strict' as const, secure: config.publicUrl.startsWith('https:') }
   const sessionId = (token: string) => digest(`${config.adminPassword}\n${token}`)
 
@@ -50,24 +51,24 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
   })
   admin.use('*', bodyLimit({ maxSize: 16 * 1024 }), renderer)
 
-  async function session(c: Context) {
+  function session(c: Context) {
     const token = getCookie(c, sessionCookie)
     if (!config.adminPassword || !token || !/^[a-f0-9]{64}$/.test(token)) return
     const id = sessionId(token)
-    const active = await database.adminSession.findFirst({ where: { id, expiresAt: { gt: new Date() } } })
-    return active?.id
+    if ((sessions.get(id) ?? 0) > Date.now()) return id
+    sessions.delete(id)
   }
 
   const protect = async (c: Context, next: () => Promise<void>) => {
-    if (!(await session(c))) {
+    if (!session(c)) {
       if (c.req.method === 'GET') return c.redirect('/')
       return failure(c, 'Sign in to moderate comments.', 403)
     }
     await next()
   }
 
-  admin.get('/', async (c) => {
-    if (await session(c)) return c.redirect('/overview')
+  admin.get('/', (c) => {
+    if (session(c)) return c.redirect('/overview')
     return c.render(<SignIn configured={!!config.adminPassword} />, { title: 'Sign in' })
   })
   admin.get('/demo', (c) => c.render(<Demo publicUrl={config.publicUrl} />, { title: 'Widget demo', area: 'demo' }))
@@ -98,22 +99,22 @@ export function createAdmin(database: PrismaClient, config: Config, akismet: Aki
     }
 
     const token = randomBytes(32).toString('hex')
-    const active = await session(c)
-    await database.$transaction([
-      database.adminSession.deleteMany({ where: { OR: [{ expiresAt: { lte: new Date(now) } }, ...(active ? [{ id: active }] : [])] } }),
-      database.adminSession.create({ data: { id: sessionId(token), expiresAt: new Date(now + sessionSeconds * 1000) } }),
-    ])
+    const active = session(c)
+    for (const [id, expiresAt] of sessions) {
+      if (id === active || expiresAt <= now) sessions.delete(id)
+    }
+    sessions.set(sessionId(token), now + sessionSeconds * 1000)
     attempts.delete(key)
     setCookie(c, sessionCookie, token, { ...cookieOptions, maxAge: sessionSeconds })
     if (wantsJson) return success(c, 'success')
     return c.redirect('/overview', 303)
   })
 
-  admin.on(['GET', 'POST'], '/logout', async (c) => {
+  admin.on(['GET', 'POST'], '/logout', (c) => {
     const fetchSite = c.req.header('Sec-Fetch-Site')
     if (!fetchSite || fetchSite === 'same-origin' || fetchSite === 'none') {
-      const id = await session(c)
-      if (id) await database.adminSession.deleteMany({ where: { id } })
+      const id = session(c)
+      if (id) sessions.delete(id)
       deleteCookie(c, sessionCookie, cookieOptions)
     }
     return c.redirect('/', 303)
