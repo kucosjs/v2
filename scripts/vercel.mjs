@@ -1,9 +1,10 @@
+// vercel.json copies this file to dist/vercel/index.mjs for deployment.
 import 'hono'; // Vercel detects the Hono entry point from this import.
 
 import { PrismaPg } from '@prisma/adapter-pg';
-import { createApp } from './dist/app.js';
-import { databaseUrl, readConfig } from './dist/config.js';
-import { PrismaClient } from './dist/generated/prisma/client.js';
+import { createApp } from '../app.js';
+import { databaseUrl, readConfig } from '../config.js';
+import { PrismaClient } from '../generated/prisma/client.js';
 
 if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
   throw new Error('Set DATABASE_URL to a PostgreSQL connection URL for Vercel.');

@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "hono",
-  "buildCommand": "npm run build && mkdir -p public/min && cp dist/widget/kucos.min.js dist/widget/kucos.min.css public/min/",
+  "outputDirectory": "dist/vercel",
+  "buildCommand": "npm run build && mkdir -p dist/vercel public/min && cp scripts/vercel.mjs dist/vercel/index.mjs && cp dist/widget/kucos.min.js dist/widget/kucos.min.css public/min/",
   "headers": [
     {
       "source": "/min/:path*",
