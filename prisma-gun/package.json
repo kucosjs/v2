@@ -1,0 +1,14 @@
+{
+  "name": "prisma-gun",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./index.js",
+  "exports": "./index.js",
+  "dependencies": {
+    "@prisma/driver-adapter-utils": "^7.0.0",
+    "gun": "^0.2020.1240"
+  },
+  "peerDependencies": {
+    "@prisma/client": ">=6.7.0"
+  }
+}

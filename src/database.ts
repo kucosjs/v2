@@ -3,10 +3,17 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from './generated/prisma/client.js'
 import { databaseUrl } from './config.js'
 
-export function openDatabase(url = databaseUrl) {
-  if (url.startsWith('file:')) {
-    return new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })
-  }
+import { withGun, gunStubAdapter } from "prisma-gun";
 
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) })
+export function openDatabase(url = databaseUrl) {
+
+  return withGun(new PrismaClient({ adapter: gunStubAdapter }), {
+    peers: url.split(",").map((s) => s.trim()),
+  });
+
+  // if (url.startsWith('file:')) {
+  //   return new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })
+  // }
+
+  // return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) })
 }

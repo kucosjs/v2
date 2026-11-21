@@ -23,6 +23,7 @@
     "format": "biome format --write ."
   },
   "dependencies": {
+    "prisma-gun": "file:./prisma-gun/",
     "@hono/node-server": "^2.1.11",
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/adapter-pg": "^7.10.1",
