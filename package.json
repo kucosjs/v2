@@ -9,15 +9,16 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "postinstall": "prisma generate",
-    "dev": "node --watch --import tsx src/server.ts",
-    "build": "npm run build:widget && prisma generate && tsc",
+    "postinstall": "npm run db:generate",
     "start": "node dist/server.js",
+    "dev": "node --watch --import tsx src/server.ts",
+    "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:import": "node --import tsx scripts/import-legacy.ts",
-    "test": "node --import tsx --test test/*.test.ts",
-    "build:widget": "esbuild public/embed/kucos.js public/embed/kucos.css --minify --target=es2020 --outdir=dist/widget --out-extension:.js=.min.js --out-extension:.css=.min.css"
+    "build": "npm run build:widget && prisma generate && tsc",
+    "build:widget": "esbuild public/embed/kucos.js public/embed/kucos.css --minify --target=es2020 --outdir=dist/widget --out-extension:.js=.min.js --out-extension:.css=.min.css",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
