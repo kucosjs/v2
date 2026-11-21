@@ -19,7 +19,7 @@ export const renderer = jsxRenderer(({ children, title, area }) => (
       <title>{title} · Kucos</title>
       <link rel="stylesheet" href="/admin/style.css" />
     </head>
-    <body>
+    <body class={area === 'demo' ? 'demo-page' : undefined}>
       <header class="site-header">
         <div class="header-inner">
           <a href="/" class="brand"><span aria-hidden="true">♥</span> Kucos</a>

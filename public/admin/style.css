@@ -15,6 +15,7 @@ a { color: var(--accent); text-underline-offset: .18em; }
 
 .site-header { background: var(--panel); border-bottom: 1px solid var(--line); }
 .header-inner, .main { width: min(100% - 2rem, 68rem); margin-inline: auto; }
+.demo-page .header-inner, .demo-page .main { width: min(100% - clamp(36px, 10vw, 96px), 48rem); }
 .header-inner { display: flex; gap: 1rem; align-items: center; min-height: 4.25rem; flex-wrap: wrap; padding-block: .65rem; }
 .brand { color: inherit; font-size: 1.3rem; font-weight: 750; text-decoration: none; letter-spacing: -.035em; }
 .brand span { color: var(--accent); }
