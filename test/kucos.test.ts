@@ -1,0 +1,175 @@
+import assert from 'node:assert/strict'
+import { after, before, test } from 'node:test'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { DatabaseSync } from 'node:sqlite'
+import { createApp } from '../src/app.js'
+import { openDatabase } from '../src/database.js'
+import { commentThreads } from '../src/comments.js'
+import type { Comment } from '../src/generated/prisma/client.js'
+
+const directory = mkdtempSync(join(tmpdir(), 'kucos-test-'))
+const filename = join(directory, 'test.db')
+const database = openDatabase(`file:${filename}`)
+const article = 'https://site.example/notes/100%25?next=%2F'
+const site = new URL(article).origin
+const visitor = randomUUID()
+const otherVisitor = randomUUID()
+const feedback: string[] = []
+const app = createApp({
+  database,
+  config: {
+    publicUrl: 'http://localhost:3000',
+    allowedOrigins: new Set(['http://localhost:3000', site]),
+    adminPassword: 'test-password',
+    akismetKey: undefined,
+    akismetTesting: false,
+    proxyHops: 1,
+  },
+  akismet: {
+    enabled: true,
+    check: async ({ content }) => {
+      if (content.includes('Unavailable')) throw new Error('Akismet unavailable')
+      return content.includes('Likely spam')
+    },
+    feedback: async (_content, decision) => { feedback.push(decision) },
+  },
+})
+
+before(() => {
+  const sqlite = new DatabaseSync(filename)
+  sqlite.exec(readFileSync('prisma/migrations/20261121000000_initial/migration.sql', 'utf8'))
+  sqlite.close()
+})
+after(async () => {
+  await database.$disconnect()
+  rmSync(directory, { recursive: true, force: true })
+})
+
+function write(path: string, body: object, user = visitor, method = 'POST', origin = site) {
+  return app.request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-Kucos-Visitor': user, Origin: origin, 'X-Forwarded-For': '192.0.2.1' },
+    body: JSON.stringify(body),
+  })
+}
+
+test('threads replies, validates edits and keeps email and unsafe markup out of public results', async () => {
+  const posted = await write('/api/comments', {
+    article_url: `${article}#comment-old`,
+    comment: '**Hello** <script>ignored</script> [unsafe](javascript:alert(1))',
+    author: '<b>Author</b>',
+    email: 'author@example.test',
+  })
+  assert.equal(posted.status, 201)
+  const { message: comment } = await posted.json()
+  assert.match(comment.comment, /<strong>Hello<\/strong>/)
+  assert.doesNotMatch(comment.comment, /<script>|href="javascript:/)
+  assert.equal(comment.email, undefined)
+
+  const replied = await write('/api/comments', {
+    article_url: article, comment: 'A reply', parent_id: comment.id,
+  }, otherVisitor)
+  assert.equal(replied.status, 201)
+  const { message: reply } = await replied.json()
+  const path = `/api/comments/${encodeURIComponent(article)}`
+  const response = await app.request(path)
+  assert.equal(response.status, 200)
+  const thread = await response.json()
+  assert.equal(thread.comments[comment.id].children[reply.id].id, reply.id)
+  assert.equal(thread.count, 2)
+  assert.equal((await write('/api/comments', {
+    article_url: article, comment: 'Trying to edit', parent_id: comment.id,
+  }, otherVisitor, 'PATCH')).status, 403)
+  assert.equal((await write('/api/comments', {
+    article_url: article, comment: 'Updated text', parent_id: comment.id,
+  }, visitor, 'PATCH')).status, 200)
+  await database.comment.update({ where: { id: comment.id }, data: { createdAt: new Date(0) } })
+  assert.equal((await write('/api/comments', {
+    article_url: article, comment: 'Trying after expiry', parent_id: comment.id,
+  }, visitor, 'PATCH')).status, 403)
+
+  const vote = { msgid: comment.id, action: 'upvote' }
+  const responses = await Promise.all([write('/api/comments/vote', vote, otherVisitor), write('/api/comments/vote', vote, otherVisitor)])
+  assert.deepEqual(responses.map(({ status }) => status).sort(), [200, 400])
+  assert.equal((await database.comment.findUniqueOrThrow({ where: { id: comment.id } })).likes, 1)
+})
+
+test('counting and removing kudos is idempotent per visitor', async () => {
+  const add = { id: article, kudo: 'add' }
+  const remove = { id: article, kudo: 'remove' }
+  const added = await Promise.all([write('/api/kudos', add), write('/api/kudos', add)])
+  for (const response of added) {
+    assert.equal(response.status, 201)
+    assert.deepEqual((await response.json()).message, { kudos: 1, given: true })
+  }
+  const path = `/api/kudos/${encodeURIComponent(article)}`
+  assert.equal((await (await app.request(path)).json()).message.kudos, 1)
+  await write('/api/kudos', remove, otherVisitor)
+  assert.equal((await (await app.request(path)).json()).message.kudos, 1)
+  await Promise.all([write('/api/kudos', remove), write('/api/kudos', remove)])
+  assert.equal((await (await app.request(path)).json()).message.kudos, 0)
+})
+
+test('holds spam and check failures, supports moderation and revokes admin sessions', async () => {
+  const spam = await write('/api/comments', { article_url: article, comment: 'Likely spam' })
+  const pending = await write('/api/comments', { article_url: article, comment: 'Unavailable' })
+  const { message: comment } = await spam.json()
+  const { message: pendingComment } = await pending.json()
+  assert.equal(comment.spam, 1)
+  assert.equal(pendingComment.spam, 1)
+  assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 404)
+  const pendingSource = `/api/comments/row/${pendingComment.id}`
+  const headers = { 'X-Kucos-Visitor': visitor }
+  assert.equal((await app.request(pendingSource, { headers })).status, 200)
+  await database.comment.update({ where: { id: pendingComment.id }, data: { createdAt: new Date(0) } })
+  assert.equal((await app.request(pendingSource, { headers })).status, 404)
+  assert.equal((await app.request('/overview')).status, 302)
+  assert.equal((await app.request('/')).headers.get('Referrer-Policy'), 'same-origin')
+  const login = await app.request('/login', {
+    method: 'POST', headers: { Origin: 'http://localhost:3000' }, body: new URLSearchParams({ password: 'test-password' }),
+  })
+  assert.equal(login.status, 303)
+  const cookie = login.headers.get('Set-Cookie')!.split(';')[0]
+  const dashboard = await app.request('/spam', { headers: { cookie } })
+  assert.equal(dashboard.status, 200)
+  assert.match(await dashboard.text(), /Likely spam/)
+  assert.equal((await app.request(`/notspam/${comment.id}`, {
+    method: 'PATCH', headers: { cookie, origin: 'https://other.example' },
+  })).status, 403)
+  assert.equal((await app.request(`/notspam/${comment.id}`, { method: 'PATCH', headers: { cookie } })).status, 200)
+  assert.deepEqual(feedback, ['submit-ham'])
+  assert.equal((await app.request(`/api/comments/row/${comment.id}`)).status, 200)
+  assert.equal((await app.request('/logout', { method: 'POST', headers: { cookie } })).status, 303)
+  assert.equal((await app.request('/spam', { headers: { cookie } })).status, 302)
+})
+
+test('only registered origins may preflight and post to their own articles', async () => {
+  const preflight = await app.request('/api/comments', {
+    method: 'OPTIONS', headers: { Origin: site, 'Access-Control-Request-Method': 'POST' },
+  })
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), site)
+  const other = await write('/api/comments', { article_url: article, comment: 'Rejected' }, visitor, 'POST', 'https://other.example')
+  assert.equal(other.status, 403)
+  assert.equal(other.headers.get('Access-Control-Allow-Origin'), null)
+})
+
+test('keeps very deep threads serializable without losing replies', () => {
+  const now = new Date()
+  const sample: Comment = {
+    id: '', article, author: 'Anonymous', content: 'A reply',
+    email: null, website: null, owner: visitor, parentId: null,
+    moderation: 'published', pinned: false, likes: 0, dislikes: 0,
+    createdAt: now, updatedAt: now, ip: null, userAgent: null,
+  }
+  const comments = Array.from({ length: 5000 }, (_, index) => ({
+    ...sample,
+    id: String(index),
+    parentId: index ? String(index - 1) : null,
+  }))
+  const roots = commentThreads(comments)
+  const payload = JSON.stringify(roots)
+  assert.equal(payload.match(/"id":/g)?.length, comments.length)
+})

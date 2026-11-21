@@ -1,0 +1,70 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Moderation {
+  published
+  pending
+  spam
+}
+
+model Comment {
+  id         String     @id @default(uuid())
+  article    String
+  author     String     @default("Anonymous")
+  content    String
+  email      String?
+  website    String?
+  owner      String
+  parentId   String?
+  parent     Comment?   @relation("Replies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies    Comment[]  @relation("Replies")
+  moderation Moderation @default(published)
+  pinned     Boolean    @default(false)
+  likes      Int        @default(0)
+  dislikes   Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @default(now())
+  ip         String?
+  userAgent  String?
+  votes      Vote[]
+
+  @@index([article, createdAt])
+  @@index([parentId])
+  @@index([moderation, createdAt])
+}
+
+model Vote {
+  commentId String
+  visitor   String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, visitor])
+}
+
+model Kudos {
+  article String        @id
+  count   Int           @default(0)
+  members KudosMember[]
+}
+
+model KudosMember {
+  article String
+  visitor String
+  kudos   Kudos  @relation(fields: [article], references: [article], onDelete: Cascade)
+
+  @@id([article, visitor])
+}
+
+model AdminSession {
+  id        String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
