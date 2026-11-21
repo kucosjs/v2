@@ -168,20 +168,22 @@ export function CommentList({ comments, article, review, page, hasNext, notice }
       <div class="comment-list">
         {comments.map((comment) => (
           <article class="comment-card">
-            <header>
-              <strong>{comment.author}</strong>
-              <time datetime={comment.createdAt.toISOString()}>{date.format(comment.createdAt)} UTC</time>
-              {comment.moderation !== 'published' && (
-                <span class="tag">{comment.moderation === 'spam' ? 'Spam' : 'Pending'}</span>
+            <div class="comment-main">
+              <header>
+                <strong>{comment.author}</strong>
+                <time datetime={comment.createdAt.toISOString()}>{date.format(comment.createdAt)} UTC</time>
+                {comment.moderation !== 'published' && (
+                  <span class="tag">{comment.moderation === 'spam' ? 'Spam' : 'Pending'}</span>
+                )}
+                {comment.pinned && <span class="tag">Pinned</span>}
+              </header>
+              {review && (
+                <a href={`/comments?url=${encodeURIComponent(comment.article.url)}`} class="article-link">
+                  {comment.article.url}
+                </a>
               )}
-              {comment.pinned && <span class="tag">Pinned</span>}
-            </header>
-            {review && (
-              <a href={`/comments?url=${encodeURIComponent(comment.article.url)}`} class="article-link">
-                {comment.article.url}
-              </a>
-            )}
-            <div class="comment-body">{raw(renderMarkdown(comment.content))}</div>
+              <div class="comment-body">{raw(renderMarkdown(comment.content))}</div>
+            </div>
             <form action={`/moderate/${comment.id}`} method="post" class="actions">
               <input type="hidden" name="view" value={review ? 'spam' : 'comments'} />
               <input type="hidden" name="page" value={page} />

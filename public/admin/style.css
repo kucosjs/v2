@@ -220,15 +220,30 @@ td:not(:first-child) {
   gap: 0.8rem;
 }
 .comment-card {
+  display: flex;
+  gap: 1rem;
   padding: 1rem;
   overflow-wrap: anywhere;
+  align-items: flex-start;
 }
-.comment-card header,
-.actions {
+.comment-main {
+  flex: 1;
+  min-width: 0;
+}
+.comment-card header {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
+}
+.actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.actions button {
+  white-space: nowrap;
 }
 .comment-card time,
 .tag,
