@@ -1,8 +1,8 @@
 import { serve } from '@hono/node-server'
 import app, { database } from './index.js'
-import { port } from './config.js'
+import { hostname, port } from './config.js'
 
-const server = serve({ fetch: app.fetch, port }, ({ port }) => {
+const server = serve({ fetch: app.fetch, hostname, port }, ({ port }) => {
   console.log(`Kucos is listening on port ${port}.`)
 })
 

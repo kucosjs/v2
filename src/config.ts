@@ -1,5 +1,6 @@
 import 'dotenv/config'
 
+export const hostname = process.env.HOST?.trim() || undefined
 export const port = readInteger(process.env.PORT ?? '3000', 'PORT', 1, 65535)
 export const databaseUrl = process.env.DATABASE_URL || 'file:./kucos.db'
 

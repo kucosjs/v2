@@ -36,6 +36,7 @@ Comments support Markdown, including links, quotes, strikethrough, and fenced co
 
 | Variable | Behavior |
 | --- | --- |
+| `HOST` | Optional bind address. When unset, Node listens on all interfaces. |
 | `PORT` | Defaults to `3000`. |
 | `PUBLIC_URL` | Defaults to `http://localhost:3000` and follows `PORT` when unset. This origin can always embed the widget. |
 | `DATABASE_URL` | Defaults to `file:./kucos.db`, relative to the project directory. |
