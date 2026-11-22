@@ -12,3 +12,4 @@ src/generated/
 *.db-*
 data/
 radata/
+backup

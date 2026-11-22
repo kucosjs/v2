@@ -151,8 +151,11 @@ async function importLegacy(directory: string) {
   try {
     await database.$transaction(
       async (tx) => {
-        if (await tx.article.count()) throw new Error('The destination database already contains articles.')
-        await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })) })
+        // if (await tx.article.count()) throw new Error('The destination database already contains articles.')
+        // await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })) })
+        //
+        await tx.article.createMany({ data: [...articles].map(([url, id]) => ({ id, url })), skipDuplicates: true })
+        //
         await tx.comment.createMany({ data: [...byId.values()] })
         for (const [id, parentId] of parents) await tx.comment.update({ where: { id }, data: { parentId } })
         await tx.vote.createMany({ data: [...uniqueVotes.values()] })
